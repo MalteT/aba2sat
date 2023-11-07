@@ -79,7 +79,7 @@
         pre-commit.settings.hooks.nil.enable = true;
         pre-commit.settings.hooks.format = {
           enable = true;
-          entry = "${self'.formatter}/bin/fmt";
+          entry = "${self'.formatter}/bin/treefmt";
           pass_filenames = false;
         };
         pre-commit.settings.hooks.my-clippy = {
