@@ -1,10 +1,10 @@
 #![feature(iter_collect_into)]
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-};
+use std::collections::{HashMap, HashSet};
 
 use cadical::Solver;
+
+type Clause = Vec<Literal>;
+type RawClause = Vec<i32>;
 
 #[derive(Debug)]
 struct Aba {
@@ -15,6 +15,41 @@ struct Aba {
 enum Literal {
     Pos(String),
     Neg(String),
+}
+
+#[derive(Debug)]
+struct Mapper {
+    map: HashMap<String, u32>,
+}
+
+impl Mapper {
+    fn new() -> Self {
+        Mapper {
+            map: HashMap::new(),
+        }
+    }
+
+    fn as_raw_iter<'s, I: IntoIterator<Item = Clause> + 's>(
+        &'s mut self,
+        aba_clauses: I,
+    ) -> impl Iterator<Item = RawClause> + 's {
+        aba_clauses
+            .into_iter()
+            .map(|clause| clause.iter().map(|lit| self.as_raw(lit)).collect())
+    }
+
+    fn as_raw(&mut self, lit: &Literal) -> i32 {
+        let key = self.map.get(lit.as_str()).copied().unwrap_or_else(|| {
+            debug_assert!(self.map.len() <= i32::MAX as usize, "Mapper overflowed");
+            let new = self.map.len() as u32 + 1;
+            self.map.insert(lit.to_string(), new);
+            new
+        }) as i32;
+        match lit {
+            Literal::Pos(_) => key,
+            Literal::Neg(_) => -key,
+        }
+    }
 }
 
 impl Aba {
@@ -75,7 +110,7 @@ impl Aba {
         clauses
     }
 
-    fn clauses_for(&self, assumption_set: Vec<char>) -> Vec<Vec<Literal>> {
+    fn clauses_for_assumption_set(&self, assumption_set: Vec<char>) -> Vec<Vec<Literal>> {
         let mut clauses = vec![];
         for assumption in self.inverses.keys() {
             if assumption_set.contains(assumption) {
@@ -88,39 +123,6 @@ impl Aba {
     }
 }
 
-fn map_clauses(
-    aba_clauses: Vec<Vec<Literal>>,
-    mappings: &mut Vec<String>,
-) -> impl Iterator<Item = Vec<i32>> + '_ {
-    aba_clauses.into_iter().scan(mappings, |map, clause| {
-        let clause = clause
-            .into_iter()
-            .map(|lit| {
-                let existing_mapping = map
-                    .iter()
-                    .enumerate()
-                    .find(|(_, item)| *item == &*lit)
-                    .map(|(idx, _)| idx as i32 + 1);
-                match existing_mapping {
-                    Some(idx) => match lit {
-                        Literal::Pos(_) => idx,
-                        Literal::Neg(_) => -idx,
-                    },
-                    None => {
-                        map.push(lit.deref().clone());
-                        let idx = map.len() as i32;
-                        match lit {
-                            Literal::Pos(_) => idx,
-                            Literal::Neg(_) => -idx,
-                        }
-                    }
-                }
-            })
-            .collect();
-        Some(clause)
-    })
-}
-
 fn main() {
     let aba = Aba::new()
         .with_assumption('a', 'r')
@@ -131,13 +133,26 @@ fn main() {
         .with_rule('r', ['b', 'c']);
     let aba_clauses = aba.as_clauses();
 
-    let extra_clauses = aba.clauses_for(vec!['a', 'b', 'c']);
+    let extra_clauses = aba.clauses_for_assumption_set(vec!['a', 'b', 'c']);
 
-    let mut mappings = vec![];
+    let mut map = Mapper::new();
     let mut sat: Solver = Default::default();
-    map_clauses(aba_clauses, &mut mappings).for_each(|clause| sat.add_clause(clause));
-    map_clauses(extra_clauses, &mut mappings).for_each(|clause| sat.add_clause(clause));
-    println!("{:?}", sat.solve());
+    map.as_raw_iter(aba_clauses)
+        .for_each(|clause| sat.add_clause(clause));
+    map.as_raw_iter(extra_clauses)
+        .for_each(|clause| sat.add_clause(clause));
+
+    match sat.solve() {
+        Some(true) => {
+            println!("True");
+        }
+        Some(false) => {
+            println!("False");
+        }
+        None => {
+            println!("No response");
+        }
+    }
 }
 
 impl std::fmt::Debug for Literal {
