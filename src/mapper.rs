@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     clauses::{Clause, RawClause},
-    Literal,
+    literal::Literal,
 };
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ impl Mapper {
         }
     }
 
-    pub fn as_raw_iter<'s, I: IntoIterator<Item = Clause> + 's>(
+    pub fn as_raw_iter<'s, I: IntoIterator<Item = &'s Clause> + 's>(
         &'s mut self,
         aba_clauses: I,
     ) -> impl Iterator<Item = RawClause> + 's {
