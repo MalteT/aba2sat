@@ -2,54 +2,16 @@
 use std::collections::{HashMap, HashSet};
 
 use cadical::Solver;
+use clauses::{Clause, ClauseList, Literal};
+use mapper::Mapper;
 
-type Clause = Vec<Literal>;
-type RawClause = Vec<i32>;
+mod clauses;
+mod mapper;
 
 #[derive(Debug)]
 struct Aba {
     rules: Vec<(char, HashSet<char>)>,
     inverses: HashMap<char, char>,
-}
-
-enum Literal {
-    Pos(String),
-    Neg(String),
-}
-
-#[derive(Debug)]
-struct Mapper {
-    map: HashMap<String, u32>,
-}
-
-impl Mapper {
-    fn new() -> Self {
-        Mapper {
-            map: HashMap::new(),
-        }
-    }
-
-    fn as_raw_iter<'s, I: IntoIterator<Item = Clause> + 's>(
-        &'s mut self,
-        aba_clauses: I,
-    ) -> impl Iterator<Item = RawClause> + 's {
-        aba_clauses
-            .into_iter()
-            .map(|clause| clause.iter().map(|lit| self.as_raw(lit)).collect())
-    }
-
-    fn as_raw(&mut self, lit: &Literal) -> i32 {
-        let key = self.map.get(lit.as_str()).copied().unwrap_or_else(|| {
-            debug_assert!(self.map.len() <= i32::MAX as usize, "Mapper overflowed");
-            let new = self.map.len() as u32 + 1;
-            self.map.insert(lit.to_string(), new);
-            new
-        }) as i32;
-        match lit {
-            Literal::Pos(_) => key,
-            Literal::Neg(_) => -key,
-        }
-    }
 }
 
 impl Aba {
@@ -70,13 +32,13 @@ impl Aba {
         self
     }
 
-    fn as_clauses(&self) -> Vec<Vec<Literal>> {
-        let mut clauses = vec![];
+    fn as_clauses(&self) -> ClauseList {
+        let mut clauses = ClauseList::new();
         for (head, body) in &self.rules {
             let mut first = body
                 .iter()
                 .map(|c| Literal::Neg(format!("support_{c}")))
-                .collect::<Vec<_>>();
+                .collect::<Clause>();
             first.push(Literal::Pos(format!("support_{head}")));
             clauses.push(first);
             body.iter()
@@ -85,11 +47,12 @@ impl Aba {
                         Literal::Neg(format!("support_{head}")),
                         Literal::Pos(format!("support_{c}")),
                     ]
+                    .into()
                 })
                 .collect_into(&mut clauses);
         }
         for (assumption, inverses) in &self.inverses {
-            clauses.push(vec![Literal::Pos(format!("inv_{assumption}_{inverses}"))]);
+            clauses.push(vec![Literal::Pos(format!("inv_{assumption}_{inverses}"))].into());
         }
         let elements = self
             .inverses
@@ -100,23 +63,26 @@ impl Aba {
             .collect::<HashSet<_>>();
         for element in elements {
             for assumption in self.inverses.keys() {
-                clauses.push(vec![
-                    Literal::Neg(format!("support_{assumption}")),
-                    Literal::Neg(format!("support_{element}")),
-                    Literal::Neg(format!("inv_{assumption}_{element}")),
-                ])
+                clauses.push(
+                    vec![
+                        Literal::Neg(format!("support_{assumption}")),
+                        Literal::Neg(format!("support_{element}")),
+                        Literal::Neg(format!("inv_{assumption}_{element}")),
+                    ]
+                    .into(),
+                )
             }
         }
         clauses
     }
 
-    fn clauses_for_assumption_set(&self, assumption_set: Vec<char>) -> Vec<Vec<Literal>> {
+    fn clauses_for_assumption_set(&self, assumption_set: Vec<char>) -> ClauseList {
         let mut clauses = vec![];
         for assumption in self.inverses.keys() {
             if assumption_set.contains(assumption) {
-                clauses.push(vec![Literal::Pos(format!("support_{assumption}"))])
+                clauses.push(vec![Literal::Pos(format!("support_{assumption}"))].into())
             } else {
-                clauses.push(vec![Literal::Neg(format!("support_{assumption}"))])
+                clauses.push(vec![Literal::Neg(format!("support_{assumption}"))].into())
             }
         }
         clauses
@@ -151,25 +117,6 @@ fn main() {
         }
         None => {
             println!("No response");
-        }
-    }
-}
-
-impl std::fmt::Debug for Literal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Literal::Pos(str) => write!(f, "+{str}"),
-            Literal::Neg(str) => write!(f, "-{str}"),
-        }
-    }
-}
-
-impl std::ops::Deref for Literal {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Literal::Pos(inner) | Literal::Neg(inner) => inner,
         }
     }
 }
