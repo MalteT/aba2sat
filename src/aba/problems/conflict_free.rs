@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use cadical::Solver;
 
 use crate::{
@@ -27,17 +25,8 @@ impl Problem for ConflictFreeness {
                 clauses.push(vec![lit!(-Inference :elem)].into())
             }
         }
-        // List of all elements of our ABA, basically our L (universe)
-        let elements = aba
-            .inverses
-            .keys()
-            .chain(aba.inverses.values())
-            .chain(aba.rules.iter().flat_map(|(_, body)| body))
-            .chain(aba.rules.iter().map(|(head, _)| head))
-            .copied()
-            .collect::<HashSet<_>>();
         // TODO: Minimize this loop
-        for elem in elements {
+        for elem in aba.universe().copied() {
             for assumption in aba.inverses.keys().copied() {
                 // For every element e in our universe and every assumption a, we cannot have the following:
                 // e is the inverse of a and both are inferred (conflict!)

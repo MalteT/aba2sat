@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     clauses::{Clause, ClauseList},
-    literal::{SetInference, SetInferenceHelper},
+    literal::{Inference, Inverse, SetInference, SetInferenceHelper},
 };
 
 use super::Problem;
@@ -18,6 +18,7 @@ impl Problem for Admissible {
         let mut clauses = vec![];
         // Create inference for the problem set
         inference_helper(&aba.rules).collect_into(&mut clauses);
+        // Force inference on all members of the set
         aba.inverses
             .keys()
             .copied()
@@ -29,7 +30,23 @@ impl Problem for Admissible {
                 }
             })
             .collect_into(&mut clauses);
-        // TODO: Attack the inference of the aba, if an attack exists
+        // Attack the inference of the aba, if an attack exists
+        for elem in aba.universe().copied() {
+            for assumption in self.assumptions.iter().copied() {
+                clauses.push(Clause::from(vec![
+                    lit!(-SetInference elem:assumption),
+                    lit!(-Inverse from:assumption to:elem),
+                    lit!(-Inference :elem),
+                ]))
+            }
+            for assumption in aba.inverses.keys().copied() {
+                clauses.push(Clause::from(vec![
+                    lit!(-SetInference elem:assumption),
+                    lit!(-Inverse from:assumption to:elem),
+                    lit!(-SetInference :elem),
+                ]))
+            }
+        }
 
         clauses
     }
@@ -45,12 +62,13 @@ impl Problem for Admissible {
 }
 
 fn inference_helper(rules: &[(char, HashSet<char>)]) -> impl Iterator<Item = Clause> + '_ {
-    let rules_combined = rules
-        .iter()
-        .fold(HashMap::new(), |mut rules, (head, body)| {
-            rules.entry(head).or_insert(vec![]).push(body);
-            rules
-        });
+    let rules_combined =
+        rules
+            .iter()
+            .fold(HashMap::<_, Vec<_>>::new(), |mut rules, (head, body)| {
+                rules.entry(head).or_default().push(body);
+                rules
+            });
     rules_combined
         .into_iter()
         .flat_map(move |(&head, bodies)| match &bodies[..] {
@@ -59,7 +77,7 @@ fn inference_helper(rules: &[(char, HashSet<char>)]) -> impl Iterator<Item = Cla
             bodies => {
                 let mut clauses = vec![];
                 bodies
-                    .into_iter()
+                    .iter()
                     .enumerate()
                     .flat_map(|(idx, body)| {
                         body_to_clauses(lit!(+SetInferenceHelper :idx :head), body)

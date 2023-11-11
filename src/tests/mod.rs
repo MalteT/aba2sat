@@ -1,4 +1,7 @@
-use crate::aba::{problems::ConflictFreeness, Aba};
+use crate::aba::{
+    problems::{Admissible, ConflictFreeness},
+    Aba,
+};
 
 #[test]
 fn simple_conflict_free_verification() {
@@ -10,6 +13,7 @@ fn simple_conflict_free_verification() {
         .with_rule('q', [])
         .with_rule('r', ['b', 'c']);
     let set_checks = vec![
+        (vec![], true),
         (vec!['a'], true),
         (vec!['b'], true),
         (vec!['c'], true),
@@ -24,6 +28,29 @@ fn simple_conflict_free_verification() {
         .for_each(|(assumptions, expectation)| {
             eprintln!("Checking set {assumptions:?}");
             let result = crate::aba::problems::solve(ConflictFreeness { assumptions }, &aba);
+            assert!(result == expectation);
+        })
+}
+
+#[test]
+fn simple_admissible_verification() {
+    let aba = Aba::new()
+        .with_assumption('a', 'c')
+        .with_assumption('b', 'd')
+        .with_rule('c', vec!['a'])
+        .with_rule('c', vec!['b'])
+        .with_rule('d', vec!['a']);
+    let set_checks = vec![
+        (vec![], true),
+        (vec!['a', 'b'], false),
+        (vec!['a'], false),
+        (vec!['b'], true),
+    ];
+    set_checks
+        .into_iter()
+        .for_each(|(assumptions, expectation)| {
+            eprintln!("Checking set {assumptions:?}");
+            let result = crate::aba::problems::solve(Admissible { assumptions }, &aba);
             assert!(result == expectation);
         })
 }

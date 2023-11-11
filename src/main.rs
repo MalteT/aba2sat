@@ -16,7 +16,7 @@ macro_rules! lit {
     };
 }
 
-use aba::{problems::ConflictFreeness, Aba};
+use aba::{problems::Admissible, Aba};
 
 pub mod aba;
 pub mod clauses;
@@ -32,13 +32,12 @@ fn main() {
         .with_assumption('c', 't')
         .with_rule('p', ['q', 'a'])
         .with_rule('q', [])
-        .with_rule('r', ['b', 'c'])
-        .with_rule('r', ['d']);
+        .with_rule('r', ['b', 'c']);
     let result = aba::problems::solve(
-        ConflictFreeness {
+        Admissible {
             assumptions: vec!['a', 'b', 'c'],
         },
         &aba,
     );
-    println!("ConflictFreeness: {result}")
+    println!("Admissible: {result}")
 }

@@ -7,7 +7,7 @@ use crate::{
 
 pub mod problems;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Aba {
     rules: Vec<(char, HashSet<char>)>,
     inverses: HashMap<char, char>,
@@ -31,6 +31,19 @@ impl Aba {
         self
     }
 
+    pub fn universe(&self) -> impl Iterator<Item = &char> {
+        // List of all elements of our ABA, basically our L (universe)
+        self.inverses
+            .keys()
+            .chain(self.inverses.values())
+            .chain(self.rules.iter().flat_map(|(_, body)| body))
+            .chain(self.rules.iter().map(|(head, _)| head))
+    }
+
+    pub fn contains_assumption(&self, a: &char) -> bool {
+        self.inverses.contains_key(a)
+    }
+
     /**
      * Translate the ABA into base rules / definitions for SAT solving
      */
@@ -50,10 +63,6 @@ impl Aba {
             .iter()
             .map(|(&from, &to)| Clause::from(vec![lit!(+Inverse :from :to)]))
     }
-
-    fn contains_assumption(&self, a: &char) -> bool {
-        self.inverses.contains_key(a)
-    }
 }
 
 fn body_to_clauses(head: crate::literal::Literal, body: &HashSet<char>) -> ClauseList {
@@ -68,12 +77,13 @@ fn body_to_clauses(head: crate::literal::Literal, body: &HashSet<char>) -> Claus
 }
 
 fn inference_helper(rules: &[(char, HashSet<char>)]) -> impl Iterator<Item = Clause> + '_ {
-    let rules_combined = rules
-        .iter()
-        .fold(HashMap::new(), |mut rules, (head, body)| {
-            rules.entry(head).or_insert(vec![]).push(body);
-            rules
-        });
+    let rules_combined =
+        rules
+            .iter()
+            .fold(HashMap::<_, Vec<_>>::new(), |mut rules, (head, body)| {
+                rules.entry(head).or_default().push(body);
+                rules
+            });
     rules_combined
         .into_iter()
         .flat_map(move |(&head, bodies)| match &bodies[..] {
@@ -82,7 +92,7 @@ fn inference_helper(rules: &[(char, HashSet<char>)]) -> impl Iterator<Item = Cla
             bodies => {
                 let mut clauses = vec![];
                 bodies
-                    .into_iter()
+                    .iter()
                     .enumerate()
                     .flat_map(|(idx, body)| {
                         body_to_clauses(lit!(+InferenceHelper :idx :head), body)

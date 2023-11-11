@@ -79,7 +79,7 @@ impl Private for SetInference {}
 impl IntoLiteral for SetInference {
     fn into_literal(self) -> String {
         let Self { elem } = self;
-        format!("inference_{elem}")
+        format!("set_inference_{elem}")
     }
 }
 
@@ -87,7 +87,7 @@ impl Private for SetInferenceHelper {}
 impl IntoLiteral for SetInferenceHelper {
     fn into_literal(self) -> String {
         let Self { idx, head } = self;
-        format!("inference_helper_{idx}_{head}")
+        format!("set_inference_helper_{idx}_{head}")
     }
 }
 

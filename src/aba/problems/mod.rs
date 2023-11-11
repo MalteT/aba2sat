@@ -7,6 +7,7 @@ use super::Aba;
 mod admissible;
 mod conflict_free;
 
+pub use admissible::Admissible;
 pub use conflict_free::ConflictFreeness;
 
 pub trait Problem {
@@ -32,6 +33,10 @@ pub fn solve<P: Problem>(problem: P, aba: &Aba) -> P::Output {
         map.as_raw_iter(&additional_clauses)
             .for_each(|raw| sat.add_clause(raw));
         if let Some(sat_result) = sat.solve() {
+            eprintln!("=> {sat_result}");
+            if sat_result {
+                eprintln!("{:#?}", map.reconstruct(&sat).collect::<Vec<_>>());
+            }
             problem.construct_output(sat_result, aba, &sat)
         } else {
             unimplemented!("What to do if the solve failed?")
