@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 cadical = "0.1.14"
+nom = "7.1.3"

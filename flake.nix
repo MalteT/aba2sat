@@ -106,6 +106,8 @@
         treefmt.flakeFormatter = true;
 
         packages.aba2sat = pkgs.callPackage ./nix/packages/aba2sat.nix {inherit rustPlatform;};
+        packages.aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix {};
+        packages.clingo = pkgs.callPackage ./nix/packages/clingo.nix {};
         packages.default = self'.packages.aba2sat;
 
         devShells.default = pkgs.mkShell {

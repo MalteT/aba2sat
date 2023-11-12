@@ -22,6 +22,7 @@ pub mod aba;
 pub mod clauses;
 pub mod literal;
 pub mod mapper;
+pub mod parser;
 #[cfg(test)]
 mod tests;
 
