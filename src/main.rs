@@ -20,6 +20,7 @@ use aba::{problems::Admissible, Aba};
 
 pub mod aba;
 pub mod clauses;
+pub mod error;
 pub mod literal;
 pub mod mapper;
 pub mod parser;

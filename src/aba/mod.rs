@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    clauses::{Clause, ClauseList},
+    clauses::{Atom, Clause, ClauseList},
     literal::{Inference, InferenceHelper, Inverse},
 };
 
@@ -9,8 +9,38 @@ pub mod problems;
 
 #[derive(Debug, Default)]
 pub struct Aba {
-    rules: Vec<(char, HashSet<char>)>,
-    inverses: HashMap<char, char>,
+    pub rules: Vec<(char, HashSet<char>)>,
+    pub inverses: HashMap<char, char>,
+}
+
+#[derive(Debug, Default)]
+pub struct AbaRaw {
+    pub rules: Vec<(Atom, HashSet<Atom>)>,
+    pub inverses: HashMap<Atom, Atom>,
+}
+impl AbaRaw {
+    pub fn size(&self) -> usize {
+        let inverses = self
+            .inverses
+            .iter()
+            .flat_map(|(assumption, inverse)| [assumption, inverse]);
+        self.rules
+            .iter()
+            .flat_map(|(key, rules)| ::std::iter::once(key).chain(rules))
+            .chain(inverses)
+            .collect::<HashSet<_>>()
+            .len()
+    }
+
+    pub fn with_assumption(mut self, assumption: Atom, inverse: Atom) -> AbaRaw {
+        self.inverses.insert(assumption, inverse);
+        self
+    }
+
+    pub fn with_rule<B: IntoIterator<Item = Atom>>(mut self, head: Atom, body: B) -> AbaRaw {
+        self.rules.push((head, body.into_iter().collect()));
+        self
+    }
 }
 
 impl Aba {
@@ -52,6 +82,19 @@ impl Aba {
         self.derive_rule_clauses().collect_into(&mut clauses);
         self.derive_inverse_clauses().collect_into(&mut clauses);
         clauses
+    }
+
+    pub fn size(&self) -> usize {
+        let inverses = self
+            .inverses
+            .iter()
+            .flat_map(|(assumption, inverse)| [assumption, inverse]);
+        self.rules
+            .iter()
+            .flat_map(|(key, rules)| ::std::iter::once(key).chain(rules))
+            .chain(inverses)
+            .collect::<HashSet<_>>()
+            .len()
     }
 
     fn derive_rule_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
