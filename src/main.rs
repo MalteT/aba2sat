@@ -1,24 +1,15 @@
 #![feature(iter_collect_into)]
 #![feature(iter_intersperse)]
 
-macro_rules! lit {
-    (+ $lit:ident $($($name:ident)?:$var:ident)*) => {
-        {
-            let constructed: $lit = $lit { $($($name:)? $var),* };
-            crate::literal::IntoLiteral::pos(constructed)
-        }
-    };
-    (- $lit:ident $($($name:ident)?:$var:ident)*) => {
-        {
-            let constructed: $lit = $lit { $($($name:)? $var),* };
-            crate::literal::IntoLiteral::neg(constructed)
-        }
-    };
-}
+use std::fs::read_to_string;
 
-use aba::{problems::Admissible, Aba};
+use aba::problems::Admissible;
+use clap::Parser;
+
+use crate::error::{Error, Result};
 
 pub mod aba;
+pub mod args;
 pub mod clauses;
 pub mod error;
 pub mod literal;
@@ -27,19 +18,29 @@ pub mod parser;
 #[cfg(test)]
 mod tests;
 
-fn main() {
-    let aba = Aba::new()
-        .with_assumption('a', 'r')
-        .with_assumption('b', 's')
-        .with_assumption('c', 't')
-        .with_rule('p', ['q', 'a'])
-        .with_rule('q', [])
-        .with_rule('r', ['b', 'c']);
-    let result = aba::problems::solve(
-        Admissible {
-            assumptions: vec!['a', 'b', 'c'],
-        },
-        &aba,
-    );
-    println!("Admissible: {result}")
+fn main() -> Result {
+    let args = args::Args::parse();
+    println!("{args:?}");
+
+    match args.problem {
+        args::Problems::VeAd { set } => {
+            let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
+            let aba = parser::aba_file(&content)?;
+            let result = aba::problems::solve(
+                Admissible {
+                    assumptions: set.into_iter().collect(),
+                },
+                &aba,
+            );
+            print_bool_result(result);
+        }
+    }
+    Ok(())
+}
+
+fn print_bool_result(result: bool) {
+    match result {
+        true => println!("YES"),
+        false => println!("NO"),
+    }
 }

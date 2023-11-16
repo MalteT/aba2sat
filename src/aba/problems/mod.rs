@@ -1,6 +1,9 @@
 use cadical::Solver;
 
-use crate::{clauses::ClauseList, mapper::Mapper};
+use crate::{
+    clauses::{Atom, ClauseList},
+    mapper::Mapper,
+};
 
 use super::Aba;
 
@@ -10,17 +13,17 @@ mod conflict_free;
 pub use admissible::Admissible;
 pub use conflict_free::ConflictFreeness;
 
-pub trait Problem {
+pub trait Problem<A: Atom> {
     type Output;
-    fn additional_clauses(&self, aba: &Aba) -> ClauseList;
-    fn construct_output(self, sat_result: bool, aba: &Aba, solver: &Solver) -> Self::Output;
+    fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList;
+    fn construct_output(self, sat_result: bool, aba: &Aba<A>, solver: &Solver) -> Self::Output;
 
-    fn check(&self, _aba: &Aba) -> bool {
+    fn check(&self, _aba: &Aba<A>) -> bool {
         true
     }
 }
 
-pub fn solve<P: Problem>(problem: P, aba: &Aba) -> P::Output {
+pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> P::Output {
     if problem.check(aba) {
         let clauses = aba.derive_clauses();
         eprintln!("Clauses from ABA: {clauses:#?}");

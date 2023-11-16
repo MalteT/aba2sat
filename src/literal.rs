@@ -1,3 +1,5 @@
+use crate::clauses::Atom;
+
 use self::private::Private;
 
 #[derive(Clone)]
@@ -25,7 +27,7 @@ impl Literal {
         Self::Neg(self.into_inner())
     }
 
-    pub fn positive(self) -> Literal {
+    pub fn positive(self) -> Self {
         Self::Pos(self.into_inner())
     }
 
@@ -36,63 +38,91 @@ impl Literal {
     }
 }
 
-pub struct Inference {
-    pub elem: char,
+pub struct Inference<A: Atom> {
+    pub elem: A,
 }
 
-pub struct InferenceHelper {
+impl<A: Atom> Inference<A> {
+    pub fn new(elem: A) -> Self {
+        Self { elem }
+    }
+}
+
+pub struct InferenceHelper<A: Atom> {
     pub idx: usize,
-    pub head: char,
+    pub head: A,
+}
+impl<A: Atom> InferenceHelper<A> {
+    pub fn new(idx: usize, head: A) -> Self {
+        Self { idx, head }
+    }
 }
 
-pub struct SetInference {
-    pub elem: char,
+pub struct SetInference<A: Atom> {
+    pub elem: A,
+}
+impl<A: Atom> SetInference<A> {
+    pub fn new(elem: A) -> Self {
+        Self { elem }
+    }
 }
 
-pub struct SetInferenceHelper {
+pub struct SetInferenceHelper<A: Atom> {
     pub idx: usize,
-    pub head: char,
+    pub head: A,
 }
 
-pub struct Inverse {
-    pub from: char,
-    pub to: char,
+impl<A: Atom> SetInferenceHelper<A> {
+    pub fn new(idx: usize, head: A) -> Self {
+        Self { idx, head }
+    }
 }
 
-impl Private for Inference {}
-impl IntoLiteral for Inference {
+pub struct Inverse<A: Atom> {
+    pub from: A,
+    pub to: A,
+}
+
+impl<A: Atom> Inverse<A> {
+    pub fn new(from: A, to: A) -> Self {
+        Self { from, to }
+    }
+}
+
+impl<A: Atom> Private for Inference<A> {}
+impl<A: Atom> IntoLiteral for Inference<A> {
     fn into_literal(self) -> String {
         let Self { elem } = self;
         format!("inference_{elem}")
     }
 }
 
-impl Private for InferenceHelper {}
-impl IntoLiteral for InferenceHelper {
+impl<A: Atom> Private for InferenceHelper<A> {}
+impl<A: Atom> IntoLiteral for InferenceHelper<A> {
     fn into_literal(self) -> String {
         let Self { idx, head } = self;
         format!("inference_helper_{idx}_{head}")
     }
 }
 
-impl Private for SetInference {}
-impl IntoLiteral for SetInference {
+impl<A: Atom> Private for SetInference<A> {}
+impl<A: Atom> IntoLiteral for SetInference<A> {
     fn into_literal(self) -> String {
         let Self { elem } = self;
         format!("set_inference_{elem}")
     }
 }
 
-impl Private for SetInferenceHelper {}
-impl IntoLiteral for SetInferenceHelper {
+impl<A: Atom> Private for SetInferenceHelper<A> {}
+impl<A: Atom> IntoLiteral for SetInferenceHelper<A> {
     fn into_literal(self) -> String {
         let Self { idx, head } = self;
         format!("set_inference_helper_{idx}_{head}")
     }
 }
 
-impl Private for Inverse {}
-impl IntoLiteral for Inverse {
+impl<A: Atom> Private for Inverse<A> {}
+impl<A: Atom> IntoLiteral for Inverse<A> {
     fn into_literal(self) -> String {
         let Self { from, to } = self;
         format!("inv_{from}_{to}")

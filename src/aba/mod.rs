@@ -2,48 +2,18 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     clauses::{Atom, Clause, ClauseList},
-    literal::{Inference, InferenceHelper, Inverse},
+    literal::{Inference, InferenceHelper, IntoLiteral, Inverse, Literal},
 };
 
 pub mod problems;
 
-#[derive(Debug, Default)]
-pub struct Aba {
-    pub rules: Vec<(char, HashSet<char>)>,
-    pub inverses: HashMap<char, char>,
+#[derive(Debug, Default, PartialEq)]
+pub struct Aba<A: Atom> {
+    pub rules: Vec<(A, HashSet<A>)>,
+    pub inverses: HashMap<A, A>,
 }
 
-#[derive(Debug, Default)]
-pub struct AbaRaw {
-    pub rules: Vec<(Atom, HashSet<Atom>)>,
-    pub inverses: HashMap<Atom, Atom>,
-}
-impl AbaRaw {
-    pub fn size(&self) -> usize {
-        let inverses = self
-            .inverses
-            .iter()
-            .flat_map(|(assumption, inverse)| [assumption, inverse]);
-        self.rules
-            .iter()
-            .flat_map(|(key, rules)| ::std::iter::once(key).chain(rules))
-            .chain(inverses)
-            .collect::<HashSet<_>>()
-            .len()
-    }
-
-    pub fn with_assumption(mut self, assumption: Atom, inverse: Atom) -> AbaRaw {
-        self.inverses.insert(assumption, inverse);
-        self
-    }
-
-    pub fn with_rule<B: IntoIterator<Item = Atom>>(mut self, head: Atom, body: B) -> AbaRaw {
-        self.rules.push((head, body.into_iter().collect()));
-        self
-    }
-}
-
-impl Aba {
+impl<A: Atom> Aba<A> {
     pub fn new() -> Self {
         Aba {
             rules: vec![],
@@ -51,17 +21,17 @@ impl Aba {
         }
     }
 
-    pub fn with_assumption(mut self, assumption: char, inverse: char) -> Self {
+    pub fn with_assumption(mut self, assumption: A, inverse: A) -> Self {
         self.inverses.insert(assumption, inverse);
         self
     }
 
-    pub fn with_rule<B: IntoIterator<Item = char>>(mut self, head: char, body: B) -> Self {
+    pub fn with_rule<B: IntoIterator<Item = A>>(mut self, head: A, body: B) -> Self {
         self.rules.push((head, body.into_iter().collect()));
         self
     }
 
-    pub fn universe(&self) -> impl Iterator<Item = &char> {
+    pub fn universe(&self) -> impl Iterator<Item = &A> {
         // List of all elements of our ABA, basically our L (universe)
         self.inverses
             .keys()
@@ -70,7 +40,7 @@ impl Aba {
             .chain(self.rules.iter().map(|(head, _)| head))
     }
 
-    pub fn contains_assumption(&self, a: &char) -> bool {
+    pub fn contains_assumption(&self, a: &A) -> bool {
         self.inverses.contains_key(a)
     }
 
@@ -102,24 +72,31 @@ impl Aba {
     }
 
     fn derive_inverse_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
-        self.inverses
-            .iter()
-            .map(|(&from, &to)| Clause::from(vec![lit!(+Inverse :from :to)]))
+        self.inverses.iter().map(|(from, to)| {
+            let inverse: Inverse<A> = Inverse {
+                from: from.clone(),
+                to: to.clone(),
+            };
+            Clause::from(vec![inverse.pos()])
+        })
     }
 }
 
-fn body_to_clauses(head: crate::literal::Literal, body: &HashSet<char>) -> ClauseList {
+fn body_to_clauses<A: Atom>(head: Literal, body: &HashSet<A>) -> ClauseList {
     let mut clauses = vec![];
-    let mut left_implication: Clause = body.iter().map(|&elem| lit!(-Inference :elem)).collect();
+    let mut left_implication: Clause = body
+        .iter()
+        .map(|elem| Inference::new(elem.clone()).neg())
+        .collect();
     left_implication.push(head.clone().positive());
     clauses.push(left_implication);
     body.iter()
-        .map(|&elem| vec![head.clone().negative(), lit!(+Inference :elem)].into())
+        .map(|elem| vec![head.clone().negative(), Inference::new(elem.clone()).pos()].into())
         .collect_into(&mut clauses);
     clauses
 }
 
-fn inference_helper(rules: &[(char, HashSet<char>)]) -> impl Iterator<Item = Clause> + '_ {
+fn inference_helper<A: Atom>(rules: &[(A, HashSet<A>)]) -> impl Iterator<Item = Clause> + '_ {
     let rules_combined =
         rules
             .iter()
@@ -129,27 +106,29 @@ fn inference_helper(rules: &[(char, HashSet<char>)]) -> impl Iterator<Item = Cla
             });
     rules_combined
         .into_iter()
-        .flat_map(move |(&head, bodies)| match &bodies[..] {
+        .flat_map(|(head, bodies)| match &bodies[..] {
             [] => unreachable!("Heads always have a body"),
-            [body] => body_to_clauses(lit!(+Inference elem:head), body),
+            [body] => body_to_clauses(Inference::new(head.clone()).pos(), body),
             bodies => {
                 let mut clauses = vec![];
                 bodies
                     .iter()
                     .enumerate()
                     .flat_map(|(idx, body)| {
-                        body_to_clauses(lit!(+InferenceHelper :idx :head), body)
+                        body_to_clauses(InferenceHelper::new(idx, head.clone()).pos(), body)
                     })
                     .collect_into(&mut clauses);
                 let helpers: Vec<_> = (0..bodies.len())
-                    .map(|idx| lit!(+InferenceHelper :idx :head))
+                    .map(|idx| InferenceHelper::new(idx, head.clone()).pos())
                     .collect();
                 let mut right_implification: Clause = helpers.iter().cloned().collect();
-                right_implification.push(lit!(-Inference elem:head));
+                right_implification.push(Inference::new(head.clone()).neg());
                 clauses.push(right_implification);
                 helpers
                     .into_iter()
-                    .map(|helper| Clause::from(vec![lit!(+Inference elem:head), helper.negative()]))
+                    .map(|helper| {
+                        Clause::from(vec![Inference::new(head.clone()).pos(), helper.negative()])
+                    })
                     .collect_into(&mut clauses);
                 clauses
             }

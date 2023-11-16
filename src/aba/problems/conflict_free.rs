@@ -3,7 +3,7 @@ use cadical::Solver;
 use crate::{
     aba::Aba,
     clauses::{Clause, ClauseList},
-    literal::{Inference, Inverse},
+    literal::{Inference, IntoLiteral, Inverse},
 };
 
 use super::Problem;
@@ -12,17 +12,17 @@ pub struct ConflictFreeness {
     pub assumptions: Vec<char>,
 }
 
-impl Problem for ConflictFreeness {
+impl Problem<char> for ConflictFreeness {
     type Output = bool;
 
-    fn additional_clauses(&self, aba: &Aba) -> ClauseList {
+    fn additional_clauses(&self, aba: &Aba<char>) -> ClauseList {
         let mut clauses = vec![];
         // Make sure that every assumption in our problem is inferred and every other not
         for elem in self.assumptions.iter().copied() {
             if aba.inverses.contains_key(&elem) {
-                clauses.push(vec![lit!(+Inference :elem)].into())
+                clauses.push(vec![Inference::new(elem).pos()].into())
             } else {
-                clauses.push(vec![lit!(-Inference :elem)].into())
+                clauses.push(vec![Inference::new(elem).neg()].into())
             }
         }
         // TODO: Minimize this loop
@@ -31,20 +31,20 @@ impl Problem for ConflictFreeness {
                 // For every element e in our universe and every assumption a, we cannot have the following:
                 // e is the inverse of a and both are inferred (conflict!)
                 clauses.push(Clause::from(vec![
-                    lit!(-Inference elem:assumption),
-                    lit!(-Inference :elem),
-                    lit!(-Inverse from:assumption to:elem),
+                    Inference::new(assumption).neg(),
+                    Inference::new(elem).neg(),
+                    Inverse::new(assumption, elem).neg(),
                 ]))
             }
         }
         clauses
     }
 
-    fn construct_output(self, sat_result: bool, _: &Aba, _: &Solver) -> Self::Output {
+    fn construct_output(self, sat_result: bool, _: &Aba<char>, _: &Solver) -> Self::Output {
         sat_result
     }
 
-    fn check(&self, aba: &Aba) -> bool {
+    fn check(&self, aba: &Aba<char>) -> bool {
         // Make sure that every assumption is part of the ABA
         self.assumptions.iter().all(|a| aba.contains_assumption(a))
     }

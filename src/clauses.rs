@@ -1,11 +1,20 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+    ops::{Deref, DerefMut},
+};
 
 use crate::literal::Literal;
 
 pub type ClauseList = Vec<Clause>;
 pub type RawClause = Vec<RawLiteral>;
 pub type RawLiteral = i32;
-pub type Atom = u32;
+
+pub trait Atom: Debug + Display + Hash + Eq + Clone {}
+
+impl Atom for String {}
+impl Atom for char {}
+impl Atom for u32 {}
 
 pub struct Clause {
     list: Vec<Literal>,
