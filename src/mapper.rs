@@ -49,4 +49,8 @@ impl Mapper {
             })
         })
     }
+
+    pub fn get_raw(&self, lit: &Literal) -> Option<i32> {
+        self.map.get(lit.as_str()).map(|&raw| raw as i32)
+    }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::aba::{
     problems::{Admissibility, ConflictFreeness, VerifyAdmissibility},
     Aba,
@@ -70,10 +72,12 @@ fn simple_admissible_thing() {
         .with_rule('p', vec!['q', 'a'])
         .with_rule('q', vec![])
         .with_rule('r', vec!['b', 'c']);
-    let admissible = vec![vec![], vec!['b', 'c']];
-    admissible.into_iter().for_each(|set| {
-        eprintln!("Checking set {set:?}");
-        let result = crate::aba::problems::solve(Admissibility, &aba).unwrap();
-        panic!();
-    })
+    let expected: Vec<HashSet<char>> = vec![set!(), set!('b', 'c')];
+    let result = crate::aba::problems::multishot_solve(Admissibility::default(), &aba).unwrap();
+    for elem in &expected {
+        assert!(result.contains(elem));
+    }
+    for elem in &result {
+        assert!(expected.contains(elem));
+    }
 }

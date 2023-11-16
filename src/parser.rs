@@ -144,13 +144,13 @@ mod tests {
     use crate::aba::Aba;
 
     macro_rules! set {
-        ($($elem:literal),*) => {{
+        ($($elem:expr),*) => {{
             vec![$($elem),*].into_iter().collect()
         }}
     }
 
     macro_rules! map {
-        ($($from:literal => $to:literal),*) => {{
+        ($($from:expr => $to:expr),*) => {{
             vec![$(($from, $to)),*].into_iter().collect()
         }}
     }
