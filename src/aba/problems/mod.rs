@@ -7,11 +7,11 @@ use crate::{
 
 use super::Aba;
 
-mod admissible;
 mod conflict_free;
+mod verify_admissibility;
 
-pub use admissible::Admissible;
 pub use conflict_free::ConflictFreeness;
+pub use verify_admissibility::VerifyAdmissibility;
 
 pub trait Problem<A: Atom> {
     type Output;

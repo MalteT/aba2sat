@@ -8,11 +8,11 @@ use crate::{
 
 use super::Problem;
 
-pub struct Admissible<A: Atom> {
+pub struct VerifyAdmissibility<A: Atom> {
     pub assumptions: Vec<A>,
 }
 
-impl<A: Atom> Problem<A> for Admissible<A> {
+impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
     type Output = bool;
 
     fn additional_clauses(&self, aba: &Aba<A>) -> crate::clauses::ClauseList {

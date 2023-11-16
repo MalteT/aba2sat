@@ -1,5 +1,5 @@
 use crate::aba::{
-    problems::{Admissible, ConflictFreeness},
+    problems::{ConflictFreeness, VerifyAdmissibility},
     Aba,
 };
 
@@ -50,7 +50,7 @@ fn simple_admissible_verification() {
         .into_iter()
         .for_each(|(assumptions, expectation)| {
             eprintln!("Checking set {assumptions:?}");
-            let result = crate::aba::problems::solve(Admissible { assumptions }, &aba);
+            let result = crate::aba::problems::solve(VerifyAdmissibility { assumptions }, &aba);
             assert!(result == expectation);
         })
 }

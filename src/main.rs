@@ -3,7 +3,7 @@
 
 use std::fs::read_to_string;
 
-use aba::problems::Admissible;
+use aba::problems::VerifyAdmissibility;
 use clap::Parser;
 
 use crate::error::{Error, Result};
@@ -27,7 +27,7 @@ fn main() -> Result {
             let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
             let aba = parser::aba_file(&content)?;
             let result = aba::problems::solve(
-                Admissible {
+                VerifyAdmissibility {
                     assumptions: set.into_iter().collect(),
                 },
                 &aba,
