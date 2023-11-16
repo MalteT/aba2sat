@@ -1,5 +1,5 @@
 use crate::aba::{
-    problems::{ConflictFreeness, VerifyAdmissibility},
+    problems::{Admissibility, ConflictFreeness, VerifyAdmissibility},
     Aba,
 };
 
@@ -27,7 +27,8 @@ fn simple_conflict_free_verification() {
         .into_iter()
         .for_each(|(assumptions, expectation)| {
             eprintln!("Checking set {assumptions:?}");
-            let result = crate::aba::problems::solve(ConflictFreeness { assumptions }, &aba);
+            let result =
+                crate::aba::problems::solve(ConflictFreeness { assumptions }, &aba).unwrap();
             assert!(result == expectation);
         })
 }
@@ -50,7 +51,29 @@ fn simple_admissible_verification() {
         .into_iter()
         .for_each(|(assumptions, expectation)| {
             eprintln!("Checking set {assumptions:?}");
-            let result = crate::aba::problems::solve(VerifyAdmissibility { assumptions }, &aba);
-            assert!(result == expectation);
+            let result =
+                crate::aba::problems::solve(VerifyAdmissibility { assumptions: assumptions.clone() }, &aba).unwrap();
+            assert!(
+                result == expectation,
+                "Expected {expectation} from solver, but got {result} while checking {assumptions:?}"
+            );
         })
+}
+
+#[ignore]
+#[test]
+fn simple_admissible_thing() {
+    let aba = Aba::new()
+        .with_assumption('a', 'r')
+        .with_assumption('b', 's')
+        .with_assumption('c', 't')
+        .with_rule('p', vec!['q', 'a'])
+        .with_rule('q', vec![])
+        .with_rule('r', vec!['b', 'c']);
+    let admissible = vec![vec![], vec!['b', 'c']];
+    admissible.into_iter().for_each(|set| {
+        eprintln!("Checking set {set:?}");
+        let result = crate::aba::problems::solve(Admissibility, &aba).unwrap();
+        panic!();
+    })
 }

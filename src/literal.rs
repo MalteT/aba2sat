@@ -18,6 +18,15 @@ pub trait IntoLiteral: Sized + private::Private {
     }
 }
 
+pub trait InferenceAtom<A: Atom>: Sized + private::Private + IntoLiteral {
+    type Helper: InferenceAtomHelper<A>;
+    fn new(atom: A) -> Self;
+}
+
+pub trait InferenceAtomHelper<A: Atom>: Sized + private::Private + IntoLiteral {
+    fn new(idx: usize, atom: A) -> Self;
+}
+
 mod private {
     pub trait Private {}
 }
@@ -52,6 +61,7 @@ pub struct InferenceHelper<A: Atom> {
     pub idx: usize,
     pub head: A,
 }
+
 impl<A: Atom> InferenceHelper<A> {
     pub fn new(idx: usize, head: A) -> Self {
         Self { idx, head }
@@ -61,6 +71,7 @@ impl<A: Atom> InferenceHelper<A> {
 pub struct SetInference<A: Atom> {
     pub elem: A,
 }
+
 impl<A: Atom> SetInference<A> {
     pub fn new(elem: A) -> Self {
         Self { elem }
@@ -96,12 +107,24 @@ impl<A: Atom> IntoLiteral for Inference<A> {
         format!("inference_{elem}")
     }
 }
+impl<A: Atom> InferenceAtom<A> for Inference<A> {
+    type Helper = InferenceHelper<A>;
+
+    fn new(atom: A) -> Self {
+        Self::new(atom)
+    }
+}
 
 impl<A: Atom> Private for InferenceHelper<A> {}
 impl<A: Atom> IntoLiteral for InferenceHelper<A> {
     fn into_literal(self) -> String {
         let Self { idx, head } = self;
         format!("inference_helper_{idx}_{head}")
+    }
+}
+impl<A: Atom> InferenceAtomHelper<A> for InferenceHelper<A> {
+    fn new(idx: usize, atom: A) -> Self {
+        Self::new(idx, atom)
     }
 }
 
@@ -112,12 +135,24 @@ impl<A: Atom> IntoLiteral for SetInference<A> {
         format!("set_inference_{elem}")
     }
 }
+impl<A: Atom> InferenceAtom<A> for SetInference<A> {
+    type Helper = SetInferenceHelper<A>;
+
+    fn new(atom: A) -> Self {
+        Self::new(atom)
+    }
+}
 
 impl<A: Atom> Private for SetInferenceHelper<A> {}
 impl<A: Atom> IntoLiteral for SetInferenceHelper<A> {
     fn into_literal(self) -> String {
         let Self { idx, head } = self;
         format!("set_inference_helper_{idx}_{head}")
+    }
+}
+impl<A: Atom> InferenceAtomHelper<A> for SetInferenceHelper<A> {
+    fn new(idx: usize, atom: A) -> Self {
+        Self::new(idx, atom)
     }
 }
 

@@ -1,5 +1,6 @@
 #![feature(iter_collect_into)]
 #![feature(iter_intersperse)]
+#![feature(result_option_inspect)]
 
 use std::fs::read_to_string;
 
@@ -18,12 +19,12 @@ pub mod parser;
 #[cfg(test)]
 mod tests;
 
-fn main() -> Result {
+fn __main() -> Result {
     let args = args::Args::parse();
     println!("{args:?}");
 
     match args.problem {
-        args::Problems::VeAd { set } => {
+        args::Problems::VerifyAdmissibility { set } => {
             let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
             let aba = parser::aba_file(&content)?;
             let result = aba::problems::solve(
@@ -31,11 +32,15 @@ fn main() -> Result {
                     assumptions: set.into_iter().collect(),
                 },
                 &aba,
-            );
+            )?;
             print_bool_result(result);
         }
     }
     Ok(())
+}
+
+fn main() -> Result {
+    __main().inspect_err(|why| eprintln!("Error: {why}"))
 }
 
 fn print_bool_result(result: bool) {

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     clauses::{Atom, Clause, ClauseList},
-    literal::{Inference, InferenceHelper, IntoLiteral, Inverse, Literal},
+    literal::{Inference, InferenceAtom, InferenceAtomHelper, IntoLiteral, Inverse, Literal},
 };
 
 pub mod problems;
@@ -68,7 +68,7 @@ impl<A: Atom> Aba<A> {
     }
 
     fn derive_rule_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
-        inference_helper(&self.rules)
+        inference_helper::<Inference<_>, _>(&self.rules)
     }
 
     fn derive_inverse_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
@@ -82,21 +82,20 @@ impl<A: Atom> Aba<A> {
     }
 }
 
-fn body_to_clauses<A: Atom>(head: Literal, body: &HashSet<A>) -> ClauseList {
+fn body_to_clauses<I: InferenceAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) -> ClauseList {
     let mut clauses = vec![];
-    let mut left_implication: Clause = body
-        .iter()
-        .map(|elem| Inference::new(elem.clone()).neg())
-        .collect();
+    let mut left_implication: Clause = body.iter().map(|elem| I::new(elem.clone()).neg()).collect();
     left_implication.push(head.clone().positive());
     clauses.push(left_implication);
     body.iter()
-        .map(|elem| vec![head.clone().negative(), Inference::new(elem.clone()).pos()].into())
+        .map(|elem| vec![head.clone().negative(), I::new(elem.clone()).pos()].into())
         .collect_into(&mut clauses);
     clauses
 }
 
-fn inference_helper<A: Atom>(rules: &[(A, HashSet<A>)]) -> impl Iterator<Item = Clause> + '_ {
+pub fn inference_helper<I: InferenceAtom<A> + IntoLiteral, A: Atom>(
+    rules: &[(A, HashSet<A>)],
+) -> impl Iterator<Item = Clause> + '_ {
     let rules_combined =
         rules
             .iter()
@@ -108,27 +107,25 @@ fn inference_helper<A: Atom>(rules: &[(A, HashSet<A>)]) -> impl Iterator<Item = 
         .into_iter()
         .flat_map(|(head, bodies)| match &bodies[..] {
             [] => unreachable!("Heads always have a body"),
-            [body] => body_to_clauses(Inference::new(head.clone()).pos(), body),
+            [body] => body_to_clauses::<I, _>(I::new(head.clone()).pos(), body),
             bodies => {
                 let mut clauses = vec![];
                 bodies
                     .iter()
                     .enumerate()
                     .flat_map(|(idx, body)| {
-                        body_to_clauses(InferenceHelper::new(idx, head.clone()).pos(), body)
+                        body_to_clauses::<I, _>(I::Helper::new(idx, head.clone()).pos(), body)
                     })
                     .collect_into(&mut clauses);
                 let helpers: Vec<_> = (0..bodies.len())
-                    .map(|idx| InferenceHelper::new(idx, head.clone()).pos())
+                    .map(|idx| I::Helper::new(idx, head.clone()).pos())
                     .collect();
                 let mut right_implification: Clause = helpers.iter().cloned().collect();
-                right_implification.push(Inference::new(head.clone()).neg());
+                right_implification.push(I::new(head.clone()).neg());
                 clauses.push(right_implification);
                 helpers
                     .into_iter()
-                    .map(|helper| {
-                        Clause::from(vec![Inference::new(head.clone()).pos(), helper.negative()])
-                    })
+                    .map(|helper| Clause::from(vec![I::new(head.clone()).pos(), helper.negative()]))
                     .collect_into(&mut clauses);
                 clauses
             }

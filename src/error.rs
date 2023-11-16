@@ -8,6 +8,10 @@ pub enum Error {
     Parse(#[from] nom::Err<nom::error::Error<String>>),
     #[error("while opening the aba file: {_0}")]
     OpeningAbaFile(::std::io::Error),
+    #[error("sat call interrupted")]
+    SatCallInterrupted,
+    #[error("problem internal check failed")]
+    ProblemCheckFailed,
 }
 
 impl From<nom::Err<nom::error::Error<&'_ str>>> for Error {

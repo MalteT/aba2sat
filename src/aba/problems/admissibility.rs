@@ -6,43 +6,34 @@ use crate::{
 
 use super::Problem;
 
-pub struct VerifyAdmissibility<A: Atom> {
-    pub assumptions: Vec<A>,
-}
+pub struct Admissibility;
 
-impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
+impl<A: Atom> Problem<A> for Admissibility {
     type Output = bool;
 
     fn additional_clauses(&self, aba: &Aba<A>) -> crate::clauses::ClauseList {
         let mut clauses = vec![];
         // Create inference for the problem set
         inference_helper::<SetInference<_>, _>(&aba.rules).collect_into(&mut clauses);
-        // Force inference on all members of the set
-        aba.inverses
+        // Prevent the empty set
+        let no_empty_set: Clause = aba
+            .inverses
             .keys()
-            .cloned()
-            .map(|assumption| {
-                if self.assumptions.contains(&assumption) {
-                    Clause::from(vec![SetInference::new(assumption).pos()])
-                } else {
-                    Clause::from(vec![SetInference::new(assumption).neg()])
-                }
-            })
-            .collect_into(&mut clauses);
+            .map(|assumption| SetInference::new(assumption.clone()).pos())
+            .collect();
+        clauses.push(no_empty_set);
         // Attack the inference of the aba, if an attack exists
         for elem in aba.universe() {
-            for assumption in self.assumptions.iter() {
-                clauses.push(Clause::from(vec![
-                    SetInference::new(assumption.clone()).neg(),
-                    Inverse::new(assumption.clone(), elem.clone()).neg(),
-                    Inference::new(elem.clone()).neg(),
-                ]))
-            }
             for assumption in aba.inverses.keys() {
                 clauses.push(Clause::from(vec![
                     SetInference::new(assumption.clone()).neg(),
                     Inverse::new(assumption.clone(), elem.clone()).neg(),
                     SetInference::new(elem.clone()).neg(),
+                ]));
+                clauses.push(Clause::from(vec![
+                    SetInference::new(assumption.clone()).neg(),
+                    Inverse::new(assumption.clone(), elem.clone()).neg(),
+                    Inference::new(elem.clone()).neg(),
                 ]))
             }
         }
@@ -57,10 +48,5 @@ impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
         _: &cadical::Solver,
     ) -> Self::Output {
         sat_result
-    }
-
-    fn check(&self, aba: &Aba<A>) -> bool {
-        // Make sure that every assumption is part of the ABA
-        self.assumptions.iter().all(|a| aba.contains_assumption(a))
     }
 }

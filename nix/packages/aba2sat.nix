@@ -19,9 +19,9 @@ in
     };
 
     meta = {
-      # description = "Awesome program description";
+      description = "ABA solver using a SAT backend";
       # homepage = "https://your.new.homepage";
-      # license = licenses.mit;
+      license = lib.licenses.gpl3;
       # maintainers = [];
     };
   }

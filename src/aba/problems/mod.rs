@@ -2,14 +2,17 @@ use cadical::Solver;
 
 use crate::{
     clauses::{Atom, ClauseList},
+    error::{Error, Result},
     mapper::Mapper,
 };
 
 use super::Aba;
 
+mod admissibility;
 mod conflict_free;
 mod verify_admissibility;
 
+pub use admissibility::Admissibility;
 pub use conflict_free::ConflictFreeness;
 pub use verify_admissibility::VerifyAdmissibility;
 
@@ -23,7 +26,7 @@ pub trait Problem<A: Atom> {
     }
 }
 
-pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> P::Output {
+pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> Result<P::Output> {
     if problem.check(aba) {
         let clauses = aba.derive_clauses();
         eprintln!("Clauses from ABA: {clauses:#?}");
@@ -40,11 +43,11 @@ pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> P::Output {
             if sat_result {
                 eprintln!("{:#?}", map.reconstruct(&sat).collect::<Vec<_>>());
             }
-            problem.construct_output(sat_result, aba, &sat)
+            Ok(problem.construct_output(sat_result, aba, &sat))
         } else {
-            unimplemented!("What to do if the solve failed?")
+            Err(Error::SatCallInterrupted)
         }
     } else {
-        unimplemented!("What to do for an invalid check?")
+        Err(Error::ProblemCheckFailed)
     }
 }
