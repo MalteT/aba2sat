@@ -31,8 +31,8 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
                     .collect();
                 clauses.push(no_empty_set);
                 // Attack the inference of the aba, if an attack exists
-                for elem in aba.universe() {
-                    for assumption in aba.inverses.keys() {
+                for assumption in aba.inverses.keys() {
+                    for elem in aba.universe() {
                         clauses.push(Clause::from(vec![
                             SetInference::new(assumption.clone()).neg(),
                             Inverse::new(assumption.clone(), elem.clone()).neg(),
@@ -42,8 +42,22 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
                             SetInference::new(assumption.clone()).neg(),
                             Inverse::new(assumption.clone(), elem.clone()).neg(),
                             Inference::new(elem.clone()).neg(),
-                        ]))
+                        ]));
+                        clauses.push(Clause::from(vec![
+                            Inference::new(assumption.clone()).neg(),
+                            Inverse::new(assumption.clone(), elem.clone()).neg(),
+                            SetInference::new(elem.clone()).neg(),
+                        ]));
                     }
+                    // If an assumption is in the set, it must not be in the attack
+                    clauses.push(Clause::from(vec![
+                        Inference::new(assumption.clone()).neg(),
+                        SetInference::new(assumption.clone()).neg(),
+                    ]));
+                    // clauses.push(Clause::from(vec![
+                    //     Inference::new(assumption.clone()).pos(),
+                    //     SetInference::new(assumption.clone()).pos(),
+                    // ]))
                 }
 
                 clauses

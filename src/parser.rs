@@ -143,18 +143,6 @@ mod tests {
 
     use crate::aba::Aba;
 
-    macro_rules! set {
-        ($($elem:expr),*) => {{
-            vec![$($elem),*].into_iter().collect()
-        }}
-    }
-
-    macro_rules! map {
-        ($($from:expr => $to:expr),*) => {{
-            vec![$(($from, $to)),*].into_iter().collect()
-        }}
-    }
-
     fn assert_parse<F, T>(parser: F, input: &str, expected: T)
     where
         F: FnMut(&str) -> nom::IResult<&str, T>,

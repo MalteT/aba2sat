@@ -9,6 +9,20 @@ use clap::Parser;
 
 use crate::error::{Error, Result};
 
+#[cfg(test)]
+macro_rules! set {
+    ($($elem:expr),*) => {{
+        vec![$($elem),*].into_iter().collect()
+    }}
+}
+
+#[cfg(test)]
+macro_rules! map {
+    ($($from:expr => $to:expr),*) => {{
+        vec![$(($from, $to)),*].into_iter().collect()
+    }}
+}
+
 pub mod aba;
 pub mod args;
 pub mod clauses;
