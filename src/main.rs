@@ -1,16 +1,12 @@
 #![feature(iter_collect_into)]
 #![feature(iter_intersperse)]
-#![feature(result_option_inspect)]
 
 use std::{collections::HashSet, fmt::Write, fs::read_to_string};
 
-use aba::problems::VerifyAdmissibility;
+use aba::problems::{admissibility::Admissibility, verify_admissibility::VerifyAdmissibility};
 use clap::Parser;
 
-use crate::{
-    aba::problems::Admissibility,
-    error::{Error, Result},
-};
+use crate::error::{Error, Result};
 
 #[cfg(test)]
 macro_rules! set {
@@ -26,13 +22,13 @@ macro_rules! map {
     }}
 }
 
-pub mod aba;
-pub mod args;
-pub mod clauses;
-pub mod error;
-pub mod literal;
-pub mod mapper;
-pub mod parser;
+mod aba;
+mod args;
+mod clauses;
+mod error;
+mod literal;
+mod mapper;
+mod parser;
 #[cfg(test)]
 mod tests;
 

@@ -12,6 +12,11 @@ pub struct Mapper {
     map: HashMap<String, u32>,
 }
 
+pub enum ReconstructedLiteral {
+    Pos(String),
+    Neg(String),
+}
+
 impl Mapper {
     pub fn new() -> Self {
         Mapper {
@@ -41,16 +46,29 @@ impl Mapper {
         }
     }
 
-    pub fn reconstruct<'s>(&'s self, sat: &'s Solver) -> impl Iterator<Item = Literal> + 's {
+    pub fn reconstruct<'s>(
+        &'s self,
+        sat: &'s Solver,
+    ) -> impl Iterator<Item = ReconstructedLiteral> + 's {
         self.map.iter().flat_map(|(lit, raw)| {
+            let (_, lit) = lit.split_once('#').expect("All literals must contain a #");
             sat.value(*raw as i32).map(|result| match result {
-                true => Literal::Pos(lit.clone()),
-                false => Literal::Neg(lit.clone()),
+                true => ReconstructedLiteral::Pos(lit.to_owned()),
+                false => ReconstructedLiteral::Neg(lit.to_owned()),
             })
         })
     }
 
     pub fn get_raw(&self, lit: &Literal) -> Option<i32> {
         self.map.get(lit.as_str()).map(|&raw| raw as i32)
+    }
+}
+
+impl std::fmt::Debug for ReconstructedLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReconstructedLiteral::Pos(str) => write!(f, "+{str}"),
+            ReconstructedLiteral::Neg(str) => write!(f, "-{str}"),
+        }
     }
 }

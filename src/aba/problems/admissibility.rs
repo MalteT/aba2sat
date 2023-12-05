@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{inference_helper, Aba},
+    aba::{inference_helper, Aba, Inference},
     clauses::{Atom, Clause, ClauseList},
-    literal::{Inference, IntoLiteral, SetInference},
+    literal::{InferenceAtom, InferenceAtomHelper, IntoLiteral},
     mapper::Mapper,
 };
 
@@ -13,6 +13,12 @@ use super::{LoopControl, MultishotProblem};
 pub struct Admissibility<A: Atom> {
     found: Vec<HashSet<A>>,
 }
+
+#[derive(Debug)]
+pub struct SetInference<A: Atom>(A);
+
+#[derive(Debug)]
+pub struct SetInferenceHelper<A: Atom>(usize, A);
 
 impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
     type Output = Vec<HashSet<A>>;
@@ -134,5 +140,19 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
         // Re-Add the empty set
         self.found.push(HashSet::new());
         self.found
+    }
+}
+
+impl<A: Atom> InferenceAtom<A> for SetInference<A> {
+    type Helper = SetInferenceHelper<A>;
+
+    fn new(atom: A) -> Self {
+        Self(atom)
+    }
+}
+
+impl<A: Atom> InferenceAtomHelper<A> for SetInferenceHelper<A> {
+    fn new(idx: usize, atom: A) -> Self {
+        Self(idx, atom)
     }
 }

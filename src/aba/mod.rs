@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     clauses::{Atom, Clause, ClauseList},
-    literal::{Inference, InferenceAtom, InferenceAtomHelper, IntoLiteral, Inverse, Literal},
+    literal::{InferenceAtom, InferenceAtomHelper, IntoLiteral, Literal},
 };
 
 pub mod problems;
@@ -13,7 +13,20 @@ pub struct Aba<A: Atom> {
     pub inverses: HashMap<A, A>,
 }
 
+#[derive(Debug)]
+pub struct Inference<A: Atom>(A);
+
+#[derive(Debug)]
+pub struct InferenceHelper<A: Atom>(usize, A);
+
+#[derive(Debug)]
+pub struct Inverse<A: Atom> {
+    pub from: A,
+    pub to: A,
+}
+
 impl<A: Atom> Aba<A> {
+    #[cfg(test)]
     pub fn new() -> Self {
         Aba {
             rules: vec![],
@@ -151,4 +164,18 @@ pub fn inference_helper<I: InferenceAtom<A> + IntoLiteral, A: Atom>(
                 clauses
             }
         })
+}
+
+impl<A: Atom> InferenceAtom<A> for Inference<A> {
+    type Helper = InferenceHelper<A>;
+
+    fn new(atom: A) -> Self {
+        Self(atom)
+    }
+}
+
+impl<A: Atom> InferenceAtomHelper<A> for InferenceHelper<A> {
+    fn new(idx: usize, atom: A) -> Self {
+        Self(idx, atom)
+    }
 }

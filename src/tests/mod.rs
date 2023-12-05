@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
 use crate::aba::{
-    problems::{Admissibility, ConflictFreeness, VerifyAdmissibility},
+    problems::{
+        admissibility::Admissibility, conflict_free::ConflictFreeness,
+        verify_admissibility::VerifyAdmissibility,
+    },
     Aba,
 };
 

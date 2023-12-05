@@ -1,9 +1,9 @@
 use cadical::Solver;
 
 use crate::{
-    aba::Aba,
+    aba::{Aba, Inference, Inverse},
     clauses::{Clause, ClauseList},
-    literal::{Inference, IntoLiteral, Inverse},
+    literal::{InferenceAtom, IntoLiteral},
 };
 
 use super::Problem;
@@ -33,7 +33,11 @@ impl Problem<char> for ConflictFreeness {
                 clauses.push(Clause::from(vec![
                     Inference::new(assumption).neg(),
                     Inference::new(elem).neg(),
-                    Inverse::new(assumption, elem).neg(),
+                    Inverse {
+                        from: assumption,
+                        to: elem,
+                    }
+                    .neg(),
                 ]))
             }
         }

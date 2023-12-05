@@ -1,10 +1,10 @@
 use crate::{
-    aba::{inference_helper, Aba},
+    aba::{inference_helper, Aba, Inference, Inverse},
     clauses::{Atom, Clause},
-    literal::{Inference, IntoLiteral, Inverse, SetInference},
+    literal::{InferenceAtom, IntoLiteral},
 };
 
-use super::Problem;
+use super::{admissibility::SetInference, Problem};
 
 pub struct VerifyAdmissibility<A: Atom> {
     pub assumptions: Vec<A>,
@@ -34,14 +34,22 @@ impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
             for assumption in self.assumptions.iter() {
                 clauses.push(Clause::from(vec![
                     SetInference::new(assumption.clone()).neg(),
-                    Inverse::new(assumption.clone(), elem.clone()).neg(),
+                    Inverse {
+                        from: assumption.clone(),
+                        to: elem.clone(),
+                    }
+                    .neg(),
                     Inference::new(elem.clone()).neg(),
                 ]))
             }
             for assumption in aba.assumptions() {
                 clauses.push(Clause::from(vec![
                     SetInference::new(assumption.clone()).neg(),
-                    Inverse::new(assumption.clone(), elem.clone()).neg(),
+                    Inverse {
+                        from: assumption.clone(),
+                        to: elem.clone(),
+                    }
+                    .neg(),
                     SetInference::new(elem.clone()).neg(),
                 ]))
             }

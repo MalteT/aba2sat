@@ -10,7 +10,7 @@ pub type ClauseList = Vec<Clause>;
 pub type RawClause = Vec<RawLiteral>;
 pub type RawLiteral = i32;
 
-pub trait Atom: Debug + Display + Hash + Eq + Clone {}
+pub trait Atom: Debug + Display + Hash + Eq + Clone + 'static {}
 
 impl Atom for String {}
 impl Atom for char {}
@@ -18,15 +18,6 @@ impl Atom for u32 {}
 
 pub struct Clause {
     list: Vec<Literal>,
-}
-
-impl std::fmt::Debug for Literal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Literal::Pos(str) => write!(f, "+{str}"),
-            Literal::Neg(str) => write!(f, "-{str}"),
-        }
-    }
 }
 
 impl std::fmt::Debug for Clause {
@@ -38,16 +29,6 @@ impl std::fmt::Debug for Clause {
             .intersperse(String::from(" "))
             .collect();
         write!(f, "{list}}}")
-    }
-}
-
-impl std::ops::Deref for Literal {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Literal::Pos(inner) | Literal::Neg(inner) => inner,
-        }
     }
 }
 

@@ -8,13 +8,9 @@ use crate::{
 
 use super::Aba;
 
-mod admissibility;
-mod conflict_free;
-mod verify_admissibility;
-
-pub use admissibility::Admissibility;
-pub use conflict_free::ConflictFreeness;
-pub use verify_admissibility::VerifyAdmissibility;
+pub mod admissibility;
+pub mod conflict_free;
+pub mod verify_admissibility;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LoopControl {
@@ -93,6 +89,11 @@ pub fn multishot_solve<A: Atom, P: MultishotProblem<A>>(
         map.as_raw_iter(&additional_clauses)
             .for_each(|raw| sat.add_clause(raw));
         let sat_result = sat.solve().ok_or(Error::SatCallInterrupted)?;
+        #[cfg(debug_assertions)]
+        if sat_result {
+            let rec = map.reconstruct(&sat).collect::<Vec<_>>();
+            eprintln!("{rec:#?}");
+        }
         let control = problem.feedback(aba, sat_result, &sat, &map);
         if control == LoopControl::Stop {
             break sat_result;
