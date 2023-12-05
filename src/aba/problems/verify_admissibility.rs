@@ -16,7 +16,7 @@ impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
     fn additional_clauses(&self, aba: &Aba<A>) -> crate::clauses::ClauseList {
         let mut clauses = vec![];
         // Create inference for the problem set
-        inference_helper::<SetInference<_>, _>(&aba.rules).collect_into(&mut clauses);
+        inference_helper::<SetInference<_>, _>(aba).collect_into(&mut clauses);
         // Force inference on all members of the set
         aba.inverses
             .keys()
@@ -38,7 +38,7 @@ impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
                     Inference::new(elem.clone()).neg(),
                 ]))
             }
-            for assumption in aba.inverses.keys() {
+            for assumption in aba.assumptions() {
                 clauses.push(Clause::from(vec![
                     SetInference::new(assumption.clone()).neg(),
                     Inverse::new(assumption.clone(), elem.clone()).neg(),

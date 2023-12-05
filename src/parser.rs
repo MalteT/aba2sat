@@ -90,7 +90,7 @@ fn aba(input: &str) -> IResult<&str, Aba<u32>> {
     );
     map(
         verify(collect_aba, |(aba, assumptions)| {
-            let with_inverses = aba.inverses.keys().copied().collect();
+            let with_inverses = aba.assumptions().copied().collect();
             let wrong = assumptions.symmetric_difference(&with_inverses);
             wrong.collect::<Vec<_>>().is_empty()
         }),

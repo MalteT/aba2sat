@@ -62,7 +62,6 @@ fn simple_admissible_verification() {
         })
 }
 
-#[ignore]
 #[test]
 fn simple_admissible_thing() {
     let aba = Aba::new()
@@ -72,12 +71,22 @@ fn simple_admissible_thing() {
         .with_rule('p', vec!['q', 'a'])
         .with_rule('q', vec![])
         .with_rule('r', vec!['b', 'c']);
-    let expected: Vec<HashSet<char>> = vec![set!(), set!('b', 'c')];
+    let expected: Vec<HashSet<char>> = vec![
+        set!(),
+        set!('a', 'b'),
+        set!('a', 'c'),
+        set!('b'),
+        set!('b', 'c'),
+        set!('c'),
+    ];
     let result = crate::aba::problems::multishot_solve(Admissibility::default(), &aba).unwrap();
     for elem in &expected {
         assert!(result.contains(elem));
     }
     for elem in &result {
-        assert!(expected.contains(elem));
+        assert!(
+            expected.contains(elem),
+            "{elem:?} was found in the result, but is not expected!"
+        );
     }
 }

@@ -40,6 +40,10 @@ impl<A: Atom> Aba<A> {
             .chain(self.rules.iter().map(|(head, _)| head))
     }
 
+    pub fn assumptions(&self) -> impl Iterator<Item = &A> {
+        self.inverses.keys()
+    }
+
     pub fn contains_assumption(&self, a: &A) -> bool {
         self.inverses.contains_key(a)
     }
@@ -68,7 +72,7 @@ impl<A: Atom> Aba<A> {
     }
 
     fn derive_rule_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
-        inference_helper::<Inference<_>, _>(&self.rules)
+        inference_helper::<Inference<_>, _>(self)
     }
 
     fn derive_inverse_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
@@ -79,6 +83,14 @@ impl<A: Atom> Aba<A> {
             };
             Clause::from(vec![inverse.pos()])
         })
+    }
+
+    fn rule_heads(&self) -> impl Iterator<Item = &A> + '_ {
+        self.rules.iter().map(|(head, _)| head)
+    }
+
+    fn has_assumption(&self, atom: &A) -> bool {
+        self.inverses.contains_key(atom)
     }
 }
 
@@ -94,19 +106,28 @@ fn body_to_clauses<I: InferenceAtom<A>, A: Atom>(head: Literal, body: &HashSet<A
 }
 
 pub fn inference_helper<I: InferenceAtom<A> + IntoLiteral, A: Atom>(
-    rules: &[(A, HashSet<A>)],
+    aba: &Aba<A>,
 ) -> impl Iterator<Item = Clause> + '_ {
-    let rules_combined =
-        rules
+    let mut rules_combined =
+        aba.rules
             .iter()
             .fold(HashMap::<_, Vec<_>>::new(), |mut rules, (head, body)| {
                 rules.entry(head).or_default().push(body);
                 rules
             });
+    let rule_heads: HashSet<_> = aba.rule_heads().collect();
+    // For every non-assumption, that is not derivable add a rule without a body
+    aba.universe()
+        .filter(|atom| !aba.has_assumption(atom))
+        .filter(|atom| !rule_heads.contains(atom))
+        .map(|atom| (atom, vec![]))
+        .collect_into(&mut rules_combined);
     rules_combined
         .into_iter()
         .flat_map(|(head, bodies)| match &bodies[..] {
-            [] => unreachable!("Heads always have a body"),
+            [] => {
+                vec![Clause::from(vec![I::new(head.clone()).neg()])]
+            }
             [body] => body_to_clauses::<I, _>(I::new(head.clone()).pos(), body),
             bodies => {
                 let mut clauses = vec![];

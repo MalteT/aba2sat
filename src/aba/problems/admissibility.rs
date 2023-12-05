@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::{
     aba::{inference_helper, Aba},
     clauses::{Atom, Clause, ClauseList},
-    literal::{Inference, IntoLiteral, Inverse, SetInference},
+    literal::{Inference, IntoLiteral, SetInference},
     mapper::Mapper,
 };
 
@@ -22,7 +22,7 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
             0 => {
                 let mut clauses = vec![];
                 // Create inference for the problem set
-                inference_helper::<SetInference<_>, _>(&aba.rules).collect_into(&mut clauses);
+                inference_helper::<SetInference<_>, _>(aba).collect_into(&mut clauses);
                 // Prevent the empty set
                 let no_empty_set: Clause = aba
                     .inverses
@@ -31,33 +31,47 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
                     .collect();
                 clauses.push(no_empty_set);
                 // Attack the inference of the aba, if an attack exists
-                for assumption in aba.inverses.keys() {
-                    for elem in aba.universe() {
-                        clauses.push(Clause::from(vec![
-                            SetInference::new(assumption.clone()).neg(),
-                            Inverse::new(assumption.clone(), elem.clone()).neg(),
-                            SetInference::new(elem.clone()).neg(),
-                        ]));
-                        clauses.push(Clause::from(vec![
-                            SetInference::new(assumption.clone()).neg(),
-                            Inverse::new(assumption.clone(), elem.clone()).neg(),
-                            Inference::new(elem.clone()).neg(),
-                        ]));
-                        clauses.push(Clause::from(vec![
+                for (assumption, inverse) in &aba.inverses {
+                    [
+                        // For any assumption `a` and it's inverse `b`:
+                        //   Inference(a) <=> not SetInference(b) and not SetInference(a)
+                        Clause::from(vec![
                             Inference::new(assumption.clone()).neg(),
-                            Inverse::new(assumption.clone(), elem.clone()).neg(),
-                            SetInference::new(elem.clone()).neg(),
-                        ]));
-                    }
-                    // If an assumption is in the set, it must not be in the attack
-                    clauses.push(Clause::from(vec![
-                        Inference::new(assumption.clone()).neg(),
-                        SetInference::new(assumption.clone()).neg(),
-                    ]));
-                    // clauses.push(Clause::from(vec![
-                    //     Inference::new(assumption.clone()).pos(),
-                    //     SetInference::new(assumption.clone()).pos(),
-                    // ]))
+                            SetInference::new(inverse.clone()).neg(),
+                        ]),
+                        Clause::from(vec![
+                            Inference::new(assumption.clone()).neg(),
+                            SetInference::new(assumption.clone()).neg(),
+                        ]),
+                        Clause::from(vec![
+                            SetInference::new(inverse.clone()).pos(),
+                            SetInference::new(assumption.clone()).pos(),
+                            Inference::new(assumption.clone()).pos(),
+                        ]),
+                        // Prevent attacks from the opponent to the selected set
+                        // For any assumption `a` and it's inverse `b`:
+                        //   Inference(b) and SetInference(a) => bottom
+                        Clause::from(vec![
+                            Inference::new(inverse.clone()).neg(),
+                            SetInference::new(assumption.clone()).neg(),
+                        ]),
+                        // Prevent self-attacks
+                        // For any assumption `a` and it's inverse `b`:
+                        //   SetInference(a) and SetInference(b) => bottom
+                        Clause::from(vec![
+                            SetInference::new(assumption.clone()).neg(),
+                            SetInference::new(inverse.clone()).neg(),
+                        ]),
+                        // Prevent attacks from the set to the opponent
+                        // For any assumption `a` and it's inverse `b`:
+                        //   Inference(a) and SetInference(b) => bottom
+                        Clause::from(vec![
+                            Inference::new(assumption.clone()).neg(),
+                            SetInference::new(inverse.clone()).neg(),
+                        ]),
+                    ]
+                    .into_iter()
+                    .collect_into(&mut clauses);
                 }
 
                 clauses
@@ -106,7 +120,6 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
                 }
             })
             .collect();
-        eprintln!("Found {found:?}");
         self.found.push(found);
         LoopControl::Continue
     }

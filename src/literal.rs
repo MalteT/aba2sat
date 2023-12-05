@@ -1,5 +1,9 @@
 use crate::clauses::Atom;
 
+mod private {
+    pub trait Private {}
+}
+
 use self::private::Private;
 
 #[derive(Clone)]
@@ -25,10 +29,6 @@ pub trait InferenceAtom<A: Atom>: Sized + private::Private + IntoLiteral {
 
 pub trait InferenceAtomHelper<A: Atom>: Sized + private::Private + IntoLiteral {
     fn new(idx: usize, atom: A) -> Self;
-}
-
-mod private {
-    pub trait Private {}
 }
 
 impl Literal {
@@ -68,6 +68,7 @@ impl<A: Atom> InferenceHelper<A> {
     }
 }
 
+// TODO: Let the problems define these things
 pub struct SetInference<A: Atom> {
     pub elem: A,
 }
@@ -89,6 +90,28 @@ impl<A: Atom> SetInferenceHelper<A> {
     }
 }
 
+// TODO: Let the problems define these things
+pub struct OpponentInference<A: Atom> {
+    pub elem: A,
+}
+
+impl<A: Atom> OpponentInference<A> {
+    pub fn new(elem: A) -> Self {
+        Self { elem }
+    }
+}
+
+pub struct OpponentInferenceHelper<A: Atom> {
+    pub idx: usize,
+    pub head: A,
+}
+
+impl<A: Atom> OpponentInferenceHelper<A> {
+    pub fn new(idx: usize, head: A) -> Self {
+        Self { idx, head }
+    }
+}
+
 pub struct Inverse<A: Atom> {
     pub from: A,
     pub to: A,
@@ -97,6 +120,16 @@ pub struct Inverse<A: Atom> {
 impl<A: Atom> Inverse<A> {
     pub fn new(from: A, to: A) -> Self {
         Self { from, to }
+    }
+}
+
+pub struct SetAttack<A: Atom> {
+    pub against: A,
+}
+
+impl<A: Atom> SetAttack<A> {
+    pub fn new(against: A) -> Self {
+        Self { against }
     }
 }
 
@@ -156,10 +189,46 @@ impl<A: Atom> InferenceAtomHelper<A> for SetInferenceHelper<A> {
     }
 }
 
+impl<A: Atom> Private for OpponentInference<A> {}
+impl<A: Atom> IntoLiteral for OpponentInference<A> {
+    fn into_literal(self) -> String {
+        let Self { elem } = self;
+        format!("set_inference_{elem}")
+    }
+}
+impl<A: Atom> InferenceAtom<A> for OpponentInference<A> {
+    type Helper = OpponentInferenceHelper<A>;
+
+    fn new(atom: A) -> Self {
+        Self::new(atom)
+    }
+}
+
+impl<A: Atom> Private for OpponentInferenceHelper<A> {}
+impl<A: Atom> IntoLiteral for OpponentInferenceHelper<A> {
+    fn into_literal(self) -> String {
+        let Self { idx, head } = self;
+        format!("set_inference_helper_{idx}_{head}")
+    }
+}
+impl<A: Atom> InferenceAtomHelper<A> for OpponentInferenceHelper<A> {
+    fn new(idx: usize, atom: A) -> Self {
+        Self::new(idx, atom)
+    }
+}
+
 impl<A: Atom> Private for Inverse<A> {}
 impl<A: Atom> IntoLiteral for Inverse<A> {
     fn into_literal(self) -> String {
         let Self { from, to } = self;
         format!("inv_{from}_{to}")
+    }
+}
+
+impl<A: Atom> Private for SetAttack<A> {}
+impl<A: Atom> IntoLiteral for SetAttack<A> {
+    fn into_literal(self) -> String {
+        let Self { against } = self;
+        format!("set_attack_{against}")
     }
 }

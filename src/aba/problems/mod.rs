@@ -58,9 +58,7 @@ pub trait MultishotProblem<A: Atom> {
 pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> Result<P::Output> {
     if problem.check(aba) {
         let clauses = aba.derive_clauses();
-        eprintln!("Clauses from ABA: {clauses:#?}");
         let additional_clauses = problem.additional_clauses(aba);
-        eprintln!("Clauses from Problem: {additional_clauses:#?}");
         let mut map = Mapper::new();
         let mut sat: Solver = Solver::default();
         map.as_raw_iter(&clauses)
@@ -68,10 +66,6 @@ pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> Result<P::Outp
         map.as_raw_iter(&additional_clauses)
             .for_each(|raw| sat.add_clause(raw));
         if let Some(sat_result) = sat.solve() {
-            eprintln!("=> {sat_result}");
-            if sat_result {
-                eprintln!("{:#?}", map.reconstruct(&sat).collect::<Vec<_>>());
-            }
             Ok(problem.construct_output(sat_result, aba, &sat))
         } else {
             Err(Error::SatCallInterrupted)

@@ -27,7 +27,7 @@ impl Problem<char> for ConflictFreeness {
         }
         // TODO: Minimize this loop
         for elem in aba.universe().copied() {
-            for assumption in aba.inverses.keys().copied() {
+            for assumption in aba.assumptions().copied() {
                 // For every element e in our universe and every assumption a, we cannot have the following:
                 // e is the inverse of a and both are inferred (conflict!)
                 clauses.push(Clause::from(vec![
