@@ -2,12 +2,15 @@
 #![feature(iter_intersperse)]
 #![feature(result_option_inspect)]
 
-use std::fs::read_to_string;
+use std::{collections::HashSet, fmt::Write, fs::read_to_string};
 
 use aba::problems::VerifyAdmissibility;
 use clap::Parser;
 
-use crate::error::{Error, Result};
+use crate::{
+    aba::problems::Admissibility,
+    error::{Error, Result},
+};
 
 #[cfg(test)]
 macro_rules! set {
@@ -35,7 +38,6 @@ mod tests;
 
 fn __main() -> Result {
     let args = args::Args::parse();
-    println!("{args:?}");
 
     match args.problem {
         args::Problems::VerifyAdmissibility { set } => {
@@ -48,6 +50,12 @@ fn __main() -> Result {
                 &aba,
             )?;
             print_bool_result(result);
+        }
+        args::Problems::EnumerateAdmissibility => {
+            let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
+            let aba = parser::aba_file(&content)?;
+            let result = aba::problems::multishot_solve(Admissibility::default(), &aba)?;
+            print_witnesses_result(result)?;
         }
     }
     Ok(())
@@ -62,4 +70,17 @@ fn print_bool_result(result: bool) {
         true => println!("YES"),
         false => println!("NO"),
     }
+}
+
+fn print_witnesses_result(result: Vec<HashSet<u32>>) -> Result {
+    result.into_iter().try_for_each(|set| {
+        let set = set
+            .into_iter()
+            .try_fold(String::new(), |mut list, num| -> Result<_, Error> {
+                write!(list, " {num}")?;
+                Result::Ok(list)
+            })?;
+        println!("w{set}");
+        Ok(())
+    })
 }

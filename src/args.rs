@@ -28,4 +28,6 @@ pub enum Problems {
         #[arg(long, short = 's', required = true)]
         set: Vec<u32>,
     },
+    #[clap(visible_alias = "ee-ad")]
+    EnumerateAdmissibility,
 }

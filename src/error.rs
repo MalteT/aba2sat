@@ -12,6 +12,8 @@ pub enum Error {
     SatCallInterrupted,
     #[error("problem internal check failed")]
     ProblemCheckFailed,
+    #[error("formatting: {_0}")]
+    Format(#[from] std::fmt::Error),
 }
 
 impl From<nom::Err<nom::error::Error<&'_ str>>> for Error {
