@@ -10,7 +10,6 @@ use super::Aba;
 
 pub mod admissibility;
 pub mod conflict_free;
-pub mod verify_admissibility;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LoopControl {
@@ -18,10 +17,17 @@ pub enum LoopControl {
     Stop,
 }
 
+pub struct SolverState<'a, A: Atom + 'a> {
+    aba: &'a Aba<A>,
+    sat_result: bool,
+    solver: &'a Solver,
+    map: &'a Mapper,
+}
+
 pub trait Problem<A: Atom> {
     type Output;
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList;
-    fn construct_output(self, sat_result: bool, aba: &Aba<A>, solver: &Solver) -> Self::Output;
+    fn construct_output(self, state: SolverState<'_, A>) -> Self::Output;
 
     fn check(&self, _aba: &Aba<A>) -> bool {
         true
@@ -31,20 +37,8 @@ pub trait Problem<A: Atom> {
 pub trait MultishotProblem<A: Atom> {
     type Output;
     fn additional_clauses(&self, aba: &Aba<A>, iteration: usize) -> ClauseList;
-    fn feedback(
-        &mut self,
-        aba: &Aba<A>,
-        sat_result: bool,
-        solver: &Solver,
-        map: &Mapper,
-    ) -> LoopControl;
-    fn construct_output(
-        self,
-        aba: &Aba<A>,
-        sat_result: bool,
-        solver: &Solver,
-        total_iterations: usize,
-    ) -> Self::Output;
+    fn feedback(&mut self, state: SolverState<'_, A>) -> LoopControl;
+    fn construct_output(self, state: SolverState<'_, A>, total_iterations: usize) -> Self::Output;
 
     fn check(&self, _aba: &Aba<A>) -> bool {
         true
@@ -62,7 +56,12 @@ pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> Result<P::Outp
         map.as_raw_iter(&additional_clauses)
             .for_each(|raw| sat.add_clause(raw));
         if let Some(sat_result) = sat.solve() {
-            Ok(problem.construct_output(sat_result, aba, &sat))
+            Ok(problem.construct_output(SolverState {
+                aba,
+                sat_result,
+                solver: &sat,
+                map: &map,
+            }))
         } else {
             Err(Error::SatCallInterrupted)
         }
@@ -94,11 +93,24 @@ pub fn multishot_solve<A: Atom, P: MultishotProblem<A>>(
             let rec = map.reconstruct(&sat).collect::<Vec<_>>();
             eprintln!("{rec:#?}");
         }
-        let control = problem.feedback(aba, sat_result, &sat, &map);
+        let control = problem.feedback(SolverState {
+            aba,
+            sat_result,
+            solver: &sat,
+            map: &map,
+        });
         if control == LoopControl::Stop {
             break sat_result;
         }
         iteration += 1;
     };
-    Ok(problem.construct_output(aba, final_result, &sat, iteration))
+    Ok(problem.construct_output(
+        SolverState {
+            aba,
+            sat_result: final_result,
+            solver: &sat,
+            map: &map,
+        },
+        iteration,
+    ))
 }

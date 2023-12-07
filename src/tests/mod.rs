@@ -2,21 +2,25 @@ use std::collections::HashSet;
 
 use crate::aba::{
     problems::{
-        admissibility::Admissibility, conflict_free::ConflictFreeness,
-        verify_admissibility::VerifyAdmissibility,
+        admissibility::{Admissibility, VerifyAdmissibility},
+        conflict_free::ConflictFreeness,
     },
     Aba,
 };
 
-#[test]
-fn simple_conflict_free_verification() {
-    let aba = Aba::new()
+fn simple_aba_example_1() -> Aba<char> {
+    Aba::new()
         .with_assumption('a', 'r')
         .with_assumption('b', 's')
         .with_assumption('c', 't')
         .with_rule('p', ['q', 'a'])
         .with_rule('q', [])
-        .with_rule('r', ['b', 'c']);
+        .with_rule('r', ['b', 'c'])
+}
+
+#[test]
+fn simple_conflict_free_verification() {
+    let aba = simple_aba_example_1();
     let set_checks = vec![
         (vec![], true),
         (vec!['a'], true),
@@ -40,12 +44,7 @@ fn simple_conflict_free_verification() {
 
 #[test]
 fn simple_admissible_verification() {
-    let aba = Aba::new()
-        .with_assumption('a', 'c')
-        .with_assumption('b', 'd')
-        .with_rule('c', vec!['a'])
-        .with_rule('c', vec!['b'])
-        .with_rule('d', vec!['a']);
+    let aba = simple_aba_example_1();
     let set_checks = vec![
         (vec![], true),
         (vec!['a', 'b'], false),
@@ -66,25 +65,34 @@ fn simple_admissible_verification() {
 }
 
 #[test]
-fn simple_admissible_thing() {
-    let aba = Aba::new()
-        .with_assumption('a', 'r')
-        .with_assumption('b', 's')
-        .with_assumption('c', 't')
-        .with_rule('p', vec!['q', 'a'])
-        .with_rule('q', vec![])
-        .with_rule('r', vec!['b', 'c']);
-    let expected: Vec<HashSet<char>> = vec![
-        set!(),
-        set!('a', 'b'),
-        set!('a', 'c'),
-        set!('b'),
-        set!('b', 'c'),
-        set!('c'),
-    ];
+fn simple_admissible_example() {
+    let aba = simple_aba_example_1();
+    let expected: Vec<HashSet<char>> = vec![set!(), set!('b'), set!('b', 'c'), set!('c')];
     let result = crate::aba::problems::multishot_solve(Admissibility::default(), &aba).unwrap();
     for elem in &expected {
-        assert!(result.contains(elem));
+        assert!(
+            result.contains(elem),
+            "{elem:?} was expected but not found in result"
+        );
+    }
+    for elem in &result {
+        assert!(
+            expected.contains(elem),
+            "{elem:?} was found in the result, but is not expected!"
+        );
+    }
+}
+
+#[test]
+fn simple_admissible_example_with_defense() {
+    let aba = simple_aba_example_1().with_rule('t', vec!['a', 'b']);
+    let expected: Vec<HashSet<char>> = vec![set!(), set!('a', 'b'), set!('b'), set!('b', 'c')];
+    let result = crate::aba::problems::multishot_solve(Admissibility::default(), &aba).unwrap();
+    for elem in &expected {
+        assert!(
+            result.contains(elem),
+            "{elem:?} was expected but not found in result"
+        );
     }
     for elem in &result {
         assert!(

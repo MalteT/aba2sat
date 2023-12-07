@@ -3,7 +3,7 @@
 
 use std::{collections::HashSet, fmt::Write, fs::read_to_string};
 
-use aba::problems::{admissibility::Admissibility, verify_admissibility::VerifyAdmissibility};
+use aba::problems::admissibility::{Admissibility, VerifyAdmissibility};
 use clap::Parser;
 
 use crate::error::{Error, Result};
@@ -35,10 +35,10 @@ mod tests;
 fn __main() -> Result {
     let args = args::Args::parse();
 
+    let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
+    let aba = parser::aba_file(&content)?;
     match args.problem {
         args::Problems::VerifyAdmissibility { set } => {
-            let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
-            let aba = parser::aba_file(&content)?;
             let result = aba::problems::solve(
                 VerifyAdmissibility {
                     assumptions: set.into_iter().collect(),
@@ -48,10 +48,12 @@ fn __main() -> Result {
             print_bool_result(result);
         }
         args::Problems::EnumerateAdmissibility => {
-            let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
-            let aba = parser::aba_file(&content)?;
             let result = aba::problems::multishot_solve(Admissibility::default(), &aba)?;
             print_witnesses_result(result)?;
+        }
+        args::Problems::SampleAdmissibility => {
+            let result = aba::problems::solve(Admissibility::default(), &aba)?;
+            print_witness_result(result)?;
         }
     }
     Ok(())
@@ -69,14 +71,16 @@ fn print_bool_result(result: bool) {
 }
 
 fn print_witnesses_result(result: Vec<HashSet<u32>>) -> Result {
-    result.into_iter().try_for_each(|set| {
-        let set = set
-            .into_iter()
-            .try_fold(String::new(), |mut list, num| -> Result<_, Error> {
-                write!(list, " {num}")?;
-                Result::Ok(list)
-            })?;
-        println!("w{set}");
-        Ok(())
-    })
+    result.into_iter().try_for_each(print_witness_result)
+}
+
+fn print_witness_result(result: HashSet<u32>) -> Result {
+    let set = result
+        .into_iter()
+        .try_fold(String::new(), |mut list, num| -> Result<_, Error> {
+            write!(list, " {num}")?;
+            Result::Ok(list)
+        })?;
+    println!("w{set}");
+    Ok(())
 }

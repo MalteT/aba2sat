@@ -1,12 +1,10 @@
-use cadical::Solver;
-
 use crate::{
     aba::{Aba, Inference, Inverse},
     clauses::{Clause, ClauseList},
     literal::{InferenceAtom, IntoLiteral},
 };
 
-use super::Problem;
+use super::{Problem, SolverState};
 
 pub struct ConflictFreeness {
     pub assumptions: Vec<char>,
@@ -44,8 +42,8 @@ impl Problem<char> for ConflictFreeness {
         clauses
     }
 
-    fn construct_output(self, sat_result: bool, _: &Aba<char>, _: &Solver) -> Self::Output {
-        sat_result
+    fn construct_output(self, state: SolverState<'_, char>) -> Self::Output {
+        state.sat_result
     }
 
     fn check(&self, aba: &Aba<char>) -> bool {

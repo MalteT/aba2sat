@@ -21,6 +21,7 @@ pub struct Args {
     pub file: PathBuf,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Subcommand)]
 pub enum Problems {
     #[clap(visible_alias = "ve-ad")]
@@ -30,4 +31,7 @@ pub enum Problems {
     },
     #[clap(visible_alias = "ee-ad")]
     EnumerateAdmissibility,
+    /// Will only return the empty extension if no other is found
+    #[clap(visible_alias = "se-ad")]
+    SampleAdmissibility,
 }
