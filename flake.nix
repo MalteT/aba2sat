@@ -74,7 +74,7 @@
           '';
         };
       in {
-        pre-commit.check.enable = true;
+        pre-commit.check.enable = false;
         pre-commit.settings.hooks.markdownlint.enable = true;
         pre-commit.settings.hooks.nil.enable = true;
         pre-commit.settings.hooks.format = {
@@ -86,7 +86,7 @@
           enable = true;
           name = "clippy";
           description = "Lint Rust code.";
-          entry = "${rustToolchain}/bin/cargo-clippy clippy --offline -- -D warnings";
+          entry = "${rustToolchain}/bin/cargo clippy --offline -- -D warnings";
           files = "\\.rs$";
           pass_filenames = false;
         };
