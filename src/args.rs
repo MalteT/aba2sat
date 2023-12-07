@@ -29,6 +29,11 @@ pub enum Problems {
         #[arg(long, short = 's', required = true)]
         set: Vec<u32>,
     },
+    #[clap(visible_alias = "dc-ad")]
+    DecideCredulousAdmissibility {
+        #[arg(long, short = 'a', required = true)]
+        query: u32,
+    },
     #[clap(visible_alias = "ee-ad")]
     EnumerateAdmissibility,
     /// Will only return the empty extension if no other is found

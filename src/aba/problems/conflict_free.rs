@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use crate::{
     aba::{Aba, Theory},
     clauses::{Atom, Clause, ClauseList},
+    error::Error,
     literal::{IntoLiteral, TheoryAtom},
+    Result,
 };
 
 use super::{Problem, SolverState};
@@ -39,8 +41,18 @@ impl<A: Atom> Problem<A> for ConflictFreeness<A> {
         state.sat_result
     }
 
-    fn check(&self, aba: &Aba<A>) -> bool {
+    fn check(&self, aba: &Aba<A>) -> Result {
         // Make sure that every assumption is part of the ABA
-        self.assumptions.iter().all(|a| aba.contains_assumption(a))
+        match self
+            .assumptions
+            .iter()
+            .find(|a| !aba.contains_assumption(a))
+        {
+            Some(assumption) => Err(Error::ProblemCheckFailed(format!(
+                "Assumption {:?} not present in ABA framework",
+                assumption
+            ))),
+            None => Ok(()),
+        }
     }
 }

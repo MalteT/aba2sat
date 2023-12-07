@@ -5,7 +5,8 @@
 use std::{collections::HashSet, fmt::Write as WriteFmt, fs::read_to_string, io::Write as WriteIo};
 
 use aba::problems::admissibility::{
-    EnumerateAdmissibleExtensions, SampleAdmissibleExtension, VerifyAdmissibleExtension,
+    DecideCredulousAdmissibility, EnumerateAdmissibleExtensions, SampleAdmissibleExtension,
+    VerifyAdmissibleExtension,
 };
 use clap::Parser;
 
@@ -58,6 +59,10 @@ fn __main() -> Result {
         }
         args::Problems::SampleAdmissibility => {
             aba::problems::solve(SampleAdmissibleExtension, &aba)?.fmt_iccma()
+        }
+        args::Problems::DecideCredulousAdmissibility { query } => {
+            aba::problems::solve(DecideCredulousAdmissibility { assumption: query }, &aba)?
+                .fmt_iccma()
         }
     }?;
     let mut stdout = std::io::stdout().lock();

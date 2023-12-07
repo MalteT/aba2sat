@@ -30,8 +30,8 @@ pub trait Problem<A: Atom> {
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList;
     fn construct_output(self, state: SolverState<'_, A>) -> Self::Output;
 
-    fn check(&self, _aba: &Aba<A>) -> bool {
-        true
+    fn check(&self, _aba: &Aba<A>) -> Result {
+        Ok(())
     }
 }
 
@@ -42,33 +42,30 @@ pub trait MultishotProblem<A: Atom> {
     fn feedback(&mut self, state: SolverState<'_, A>) -> LoopControl;
     fn construct_output(self, state: SolverState<'_, A>, total_iterations: usize) -> Self::Output;
 
-    fn check(&self, _aba: &Aba<A>) -> bool {
-        true
+    fn check(&self, _aba: &Aba<A>) -> Result {
+        Ok(())
     }
 }
 
 pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> Result<P::Output> {
-    if problem.check(aba) {
-        let clauses = aba.derive_clauses();
-        let additional_clauses = problem.additional_clauses(aba);
-        let mut map = Mapper::new();
-        let mut sat: Solver = Solver::default();
-        map.as_raw_iter(&clauses)
-            .for_each(|raw| sat.add_clause(raw));
-        map.as_raw_iter(&additional_clauses)
-            .for_each(|raw| sat.add_clause(raw));
-        if let Some(sat_result) = sat.solve() {
-            Ok(problem.construct_output(SolverState {
-                aba,
-                sat_result,
-                solver: &sat,
-                map: &map,
-            }))
-        } else {
-            Err(Error::SatCallInterrupted)
-        }
+    problem.check(aba)?;
+    let clauses = aba.derive_clauses();
+    let additional_clauses = problem.additional_clauses(aba);
+    let mut map = Mapper::new();
+    let mut sat: Solver = Solver::default();
+    map.as_raw_iter(&clauses)
+        .for_each(|raw| sat.add_clause(raw));
+    map.as_raw_iter(&additional_clauses)
+        .for_each(|raw| sat.add_clause(raw));
+    if let Some(sat_result) = sat.solve() {
+        Ok(problem.construct_output(SolverState {
+            aba,
+            sat_result,
+            solver: &sat,
+            map: &map,
+        }))
     } else {
-        Err(Error::ProblemCheckFailed)
+        Err(Error::SatCallInterrupted)
     }
 }
 
@@ -76,9 +73,7 @@ pub fn multishot_solve<A: Atom, P: MultishotProblem<A>>(
     mut problem: P,
     aba: &Aba<A>,
 ) -> Result<P::Output> {
-    if !problem.check(aba) {
-        return Err(Error::ProblemCheckFailed);
-    }
+    problem.check(aba)?;
     let mut map = Mapper::new();
     let mut sat: Solver = Solver::default();
     let mut iteration = 0;

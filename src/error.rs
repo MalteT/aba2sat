@@ -10,8 +10,8 @@ pub enum Error {
     OpeningAbaFile(::std::io::Error),
     #[error("sat call interrupted")]
     SatCallInterrupted,
-    #[error("problem internal check failed")]
-    ProblemCheckFailed,
+    #[error("problem internal check failed: {_0}")]
+    ProblemCheckFailed(String),
     #[error("formatting: {_0}")]
     Format(#[from] std::fmt::Error),
     #[error("outputting: {_0}")]

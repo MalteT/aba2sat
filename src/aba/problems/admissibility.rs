@@ -4,7 +4,9 @@ use std::collections::HashSet;
 use crate::{
     aba::{inference_helper, Aba, Theory},
     clauses::{Atom, Clause, ClauseList},
+    error::Error,
     literal::{IntoLiteral, TheoryAtom},
+    Result,
 };
 
 use super::{LoopControl, MultishotProblem, Problem, SolverState};
@@ -23,6 +25,11 @@ pub struct SampleAdmissibleExtension;
 /// Verify wether `assumptions` is an admissible extension of an [`Aba`]
 pub struct VerifyAdmissibleExtension<A: Atom> {
     pub assumptions: Vec<A>,
+}
+
+/// Decide whether `assumption` is credulously admissible in an [`Aba`]
+pub struct DecideCredulousAdmissibility<A> {
+    pub assumption: A,
 }
 
 /// *(Literal)* `A` is element of `th(S)`
@@ -203,9 +210,43 @@ impl<A: Atom> Problem<A> for VerifyAdmissibleExtension<A> {
         state.sat_result
     }
 
-    fn check(&self, aba: &Aba<A>) -> bool {
+    fn check(&self, aba: &Aba<A>) -> Result {
         // Make sure that every assumption is part of the ABA
-        self.assumptions.iter().all(|a| aba.contains_assumption(a))
+        match self
+            .assumptions
+            .iter()
+            .find(|a| !aba.contains_assumption(a))
+        {
+            Some(assumption) => Err(Error::ProblemCheckFailed(format!(
+                "Assumption {assumption:?} not present in ABA framework"
+            ))),
+            None => Ok(()),
+        }
+    }
+}
+
+impl<A: Atom> Problem<A> for DecideCredulousAdmissibility<A> {
+    type Output = bool;
+
+    fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
+        let mut clauses = initial_clauses(aba);
+        clauses.push(Clause::from(vec![SetTheory(self.assumption.clone()).pos()]));
+        clauses
+    }
+
+    fn construct_output(self, state: SolverState<'_, A>) -> Self::Output {
+        state.sat_result
+    }
+
+    fn check(&self, aba: &Aba<A>) -> Result {
+        if aba.has_assumption(&self.assumption) {
+            Ok(())
+        } else {
+            Err(Error::ProblemCheckFailed(format!(
+                "Assumption {:?} not present in ABA framework",
+                self.assumption
+            )))
+        }
     }
 }
 
