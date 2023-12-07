@@ -39,4 +39,11 @@ pub enum Problems {
     /// Will only return the empty extension if no other is found
     #[clap(visible_alias = "se-ad")]
     SampleAdmissibility,
+    #[clap(visible_alias = "ee-co")]
+    EnumerateComplete,
+    #[clap(visible_alias = "dc-co")]
+    DecideCredulousComplete {
+        #[arg(long, short = 'a', required = true)]
+        query: u32,
+    },
 }

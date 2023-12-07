@@ -9,7 +9,7 @@ use crate::{
     Result,
 };
 
-use super::{LoopControl, MultishotProblem, Problem, SolverState};
+use super::{LoopControl, MultishotProblem, Problem, SetTheory, SolverState};
 
 /// Compute all admissible extensions for an [`Aba`]
 #[derive(Default, Debug)]
@@ -32,18 +32,10 @@ pub struct DecideCredulousAdmissibility<A> {
     pub assumption: A,
 }
 
-/// *(Literal)* `A` is element of `th(S)`
-#[derive(Debug)]
-pub struct SetTheory<A: Atom>(A);
-
-/// Helper for [`SetTheory`]
-#[derive(Debug)]
-pub struct SetTheoryHelper<A: Atom>(usize, A);
-
-fn initial_clauses<A: Atom>(aba: &Aba<A>) -> ClauseList {
+pub fn initial_admissibility_clauses<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> ClauseList {
     let mut clauses = vec![];
     // Create inference for the problem set
-    theory_helper::<SetTheory<_>, _>(aba).collect_into(&mut clauses);
+    theory_helper::<I, _>(aba).collect_into(&mut clauses);
     // Attack the inference of the aba, if an attack exists
     for (assumption, inverse) in &aba.inverses {
         [
@@ -99,7 +91,7 @@ impl<A: Atom> Problem<A> for SampleAdmissibleExtension {
     type Output = HashSet<A>;
 
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
-        let mut clauses = initial_clauses(aba);
+        let mut clauses = initial_admissibility_clauses::<SetTheory<_>, _>(aba);
         // Prevent the empty set
         let no_empty_set: Clause = aba
             .inverses
@@ -125,7 +117,7 @@ impl<A: Atom> MultishotProblem<A> for EnumerateAdmissibleExtensions<A> {
     fn additional_clauses(&self, aba: &Aba<A>, iteration: usize) -> ClauseList {
         match iteration {
             0 => {
-                let mut clauses = initial_clauses(aba);
+                let mut clauses = initial_admissibility_clauses::<SetTheory<_>, _>(aba);
                 // Prevent the empty set
                 let no_empty_set: Clause = aba
                     .inverses
@@ -193,7 +185,7 @@ impl<A: Atom> Problem<A> for VerifyAdmissibleExtension<A> {
     type Output = bool;
 
     fn additional_clauses(&self, aba: &Aba<A>) -> crate::clauses::ClauseList {
-        let mut clauses = initial_clauses(aba);
+        let mut clauses = initial_admissibility_clauses::<SetTheory<_>, _>(aba);
         // Force inference on all members of the set
         for assumption in aba.assumptions() {
             let inf = SetTheory::new(assumption.clone());
@@ -229,7 +221,7 @@ impl<A: Atom> Problem<A> for DecideCredulousAdmissibility<A> {
     type Output = bool;
 
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
-        let mut clauses = initial_clauses(aba);
+        let mut clauses = initial_admissibility_clauses::<SetTheory<_>, _>(aba);
         clauses.push(Clause::from(vec![SetTheory(self.assumption.clone()).pos()]));
         clauses
     }
@@ -247,17 +239,5 @@ impl<A: Atom> Problem<A> for DecideCredulousAdmissibility<A> {
                 self.assumption
             )))
         }
-    }
-}
-
-impl<A: Atom> TheoryAtom<A> for SetTheory<A> {
-    type Helper = SetTheoryHelper<A>;
-
-    fn new(atom: A) -> Self {
-        Self(atom)
-    }
-
-    fn new_helper(idx: usize, atom: A) -> Self::Helper {
-        SetTheoryHelper(idx, atom)
     }
 }

@@ -3,12 +3,14 @@ use cadical::Solver;
 use crate::{
     clauses::{Atom, ClauseList},
     error::{Error, Result},
+    literal::TheoryAtom,
     mapper::Mapper,
 };
 
 use super::Aba;
 
 pub mod admissibility;
+pub mod complete;
 pub mod conflict_free;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -46,6 +48,14 @@ pub trait MultishotProblem<A: Atom> {
         Ok(())
     }
 }
+
+/// *(Literal)* `A` is element of `th(S)`
+#[derive(Debug)]
+pub struct SetTheory<A: Atom>(A);
+
+/// Helper for [`SetTheory`]
+#[derive(Debug)]
+pub struct SetTheoryHelper<A: Atom>(usize, A);
 
 pub fn solve<A: Atom, P: Problem<A>>(problem: P, aba: &Aba<A>) -> Result<P::Output> {
     problem.check(aba)?;
@@ -110,4 +120,16 @@ pub fn multishot_solve<A: Atom, P: MultishotProblem<A>>(
         },
         iteration,
     ))
+}
+
+impl<A: Atom> TheoryAtom<A> for SetTheory<A> {
+    type Helper = SetTheoryHelper<A>;
+
+    fn new(atom: A) -> Self {
+        Self(atom)
+    }
+
+    fn new_helper(idx: usize, atom: A) -> Self::Helper {
+        SetTheoryHelper(idx, atom)
+    }
 }
