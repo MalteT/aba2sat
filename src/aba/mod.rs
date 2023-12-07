@@ -78,7 +78,7 @@ impl<A: Atom> Aba<A> {
     }
 
     fn derive_rule_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
-        inference_helper::<Theory<_>, _>(self)
+        theory_helper::<Theory<_>, _>(self)
     }
 
     fn rule_heads(&self) -> impl Iterator<Item = &A> + '_ {
@@ -101,9 +101,15 @@ fn body_to_clauses<I: TheoryAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) 
     clauses
 }
 
-pub fn inference_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
+/// Generate the logic for theory derivation in the given [`Aba`]
+///
+/// This will need a valid [`TheoryAtom`] that will be used to construct the logic
+// TODO: describe how this is done
+pub fn theory_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
     aba: &Aba<A>,
 ) -> impl Iterator<Item = Clause> + '_ {
+    // The combined list of rules, such that every
+    // head is unique and possible contains a list of bodies
     let mut rules_combined =
         aba.rules
             .iter()
@@ -111,20 +117,29 @@ pub fn inference_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
                 rules.entry(head).or_default().push(body);
                 rules
             });
+    // All atoms that can be derived by rules
     let rule_heads: HashSet<_> = aba.rule_heads().collect();
-    // For every non-assumption, that is not derivable add a rule without a body
+    // For every non-assumption, that is not derivable add a rule without a body,
+    // such that it cannot be derived at all. This is to prevent the solver from
+    // guessing this atom on it's own
     aba.universe()
         .filter(|atom| !aba.has_assumption(atom))
         .filter(|atom| !rule_heads.contains(atom))
         .map(|atom| (atom, vec![]))
         .collect_into(&mut rules_combined);
+    // All combined rules
+    // These are heads with any number of bodies, possibly none
     rules_combined
         .into_iter()
         .flat_map(|(head, bodies)| match &bodies[..] {
+            // No bodies, add a clause that prevents the head from accuring in the theory
             [] => {
                 vec![Clause::from(vec![I::new(head.clone()).neg()])]
             }
+            // A single body only, this is equivalent to a head that can only be derived by a single rule
             [body] => body_to_clauses::<I, _>(I::new(head.clone()).pos(), body),
+            // n bodies, we'll need to take extra care to allow any number of bodies to derive this
+            // head without logic errors
             bodies => {
                 let mut clauses = vec![];
                 bodies

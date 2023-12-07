@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{inference_helper, Aba, Theory},
+    aba::{theory_helper, Aba, Theory},
     clauses::{Atom, Clause, ClauseList},
     error::Error,
     literal::{IntoLiteral, TheoryAtom},
@@ -43,12 +43,12 @@ pub struct SetTheoryHelper<A: Atom>(usize, A);
 fn initial_clauses<A: Atom>(aba: &Aba<A>) -> ClauseList {
     let mut clauses = vec![];
     // Create inference for the problem set
-    inference_helper::<SetTheory<_>, _>(aba).collect_into(&mut clauses);
+    theory_helper::<SetTheory<_>, _>(aba).collect_into(&mut clauses);
     // Attack the inference of the aba, if an attack exists
     for (assumption, inverse) in &aba.inverses {
         [
             // For any assumption `a` and it's inverse `b`:
-            //   Inference(a) <=> not SetInference(b)
+            //   a in th(A) <=> b not in th(S)
             Clause::from(vec![
                 Theory::new(assumption.clone()).pos(),
                 SetTheory::new(inverse.clone()).pos(),
@@ -59,14 +59,14 @@ fn initial_clauses<A: Atom>(aba: &Aba<A>) -> ClauseList {
             ]),
             // Prevent attacks from the opponent to the selected set
             // For any assumption `a` and it's inverse `b`:
-            //   Inference(b) and SetInference(a) => bottom
+            //   b in th(A) and a in th(S) => bottom
             Clause::from(vec![
                 Theory::new(inverse.clone()).neg(),
                 SetTheory::new(assumption.clone()).neg(),
             ]),
             // Prevent self-attacks
             // For any assumption `a` and it's inverse `b`:
-            //   SetInference(a) and SetInference(b) => bottom
+            //   a in th(S) and b in th(S) => bottom
             Clause::from(vec![
                 SetTheory::new(assumption.clone()).neg(),
                 SetTheory::new(inverse.clone()).neg(),

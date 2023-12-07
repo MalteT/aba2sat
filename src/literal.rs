@@ -41,7 +41,7 @@ impl<T: Any + Debug + Sized> IntoLiteral for T {
 /// ([`Literal`]) A literal that can be used to construct the logic behind
 /// the theory of a (sub-)set of assumptions (`th(S)`) in an [`Aba`](crate::aba::Aba).
 ///
-/// See [`crate::aba::inference_helper`].
+/// See [`crate::aba::theory_helper`].
 pub trait TheoryAtom<A: Atom>: Sized + IntoLiteral {
     /// Helper type
     type Helper: IntoLiteral;
