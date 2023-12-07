@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::aba::{
     problems::{
-        admissibility::{Admissibility, VerifyAdmissibility},
+        admissibility::{EnumerateAdmissibleExtensions, VerifyAdmissibleExtension},
         conflict_free::ConflictFreeness,
     },
     Aba,
@@ -22,14 +22,14 @@ fn simple_aba_example_1() -> Aba<char> {
 fn simple_conflict_free_verification() {
     let aba = simple_aba_example_1();
     let set_checks = vec![
-        (vec![], true),
-        (vec!['a'], true),
-        (vec!['b'], true),
-        (vec!['c'], true),
-        (vec!['a', 'b'], true),
-        (vec!['a', 'c'], true),
-        (vec!['b', 'c'], true),
-        (vec!['a', 'b', 'c'], false),
+        (set![], true),
+        (set!['a'], true),
+        (set!['b'], true),
+        (set!['c'], true),
+        (set!['a', 'b'], true),
+        (set!['a', 'c'], true),
+        (set!['b', 'c'], true),
+        (set!['a', 'b', 'c'], false),
     ];
 
     set_checks
@@ -56,7 +56,7 @@ fn simple_admissible_verification() {
         .for_each(|(assumptions, expectation)| {
             eprintln!("Checking set {assumptions:?}");
             let result =
-                crate::aba::problems::solve(VerifyAdmissibility { assumptions: assumptions.clone() }, &aba).unwrap();
+                crate::aba::problems::solve(VerifyAdmissibleExtension { assumptions: assumptions.clone() }, &aba).unwrap();
             assert!(
                 result == expectation,
                 "Expected {expectation} from solver, but got {result} while checking {assumptions:?}"
@@ -68,7 +68,9 @@ fn simple_admissible_verification() {
 fn simple_admissible_example() {
     let aba = simple_aba_example_1();
     let expected: Vec<HashSet<char>> = vec![set!(), set!('b'), set!('b', 'c'), set!('c')];
-    let result = crate::aba::problems::multishot_solve(Admissibility::default(), &aba).unwrap();
+    let result =
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+            .unwrap();
     for elem in &expected {
         assert!(
             result.contains(elem),
@@ -87,7 +89,9 @@ fn simple_admissible_example() {
 fn simple_admissible_example_with_defense() {
     let aba = simple_aba_example_1().with_rule('t', vec!['a', 'b']);
     let expected: Vec<HashSet<char>> = vec![set!(), set!('a', 'b'), set!('b'), set!('b', 'c')];
-    let result = crate::aba::problems::multishot_solve(Admissibility::default(), &aba).unwrap();
+    let result =
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+            .unwrap();
     for elem in &expected {
         assert!(
             result.contains(elem),

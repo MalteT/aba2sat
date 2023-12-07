@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     clauses::{Atom, Clause, ClauseList},
-    literal::{InferenceAtom, InferenceAtomHelper, IntoLiteral, Literal},
+    literal::{IntoLiteral, Literal, TheoryAtom},
 };
 
 pub mod problems;
@@ -14,16 +14,10 @@ pub struct Aba<A: Atom> {
 }
 
 #[derive(Debug)]
-pub struct Inference<A: Atom>(A);
+pub struct Theory<A: Atom>(A);
 
 #[derive(Debug)]
-pub struct InferenceHelper<A: Atom>(usize, A);
-
-#[derive(Debug)]
-pub struct Inverse<A: Atom> {
-    pub from: A,
-    pub to: A,
-}
+pub struct TheoryHelper<A: Atom>(usize, A);
 
 impl<A: Atom> Aba<A> {
     #[cfg(test)]
@@ -67,7 +61,6 @@ impl<A: Atom> Aba<A> {
     pub fn derive_clauses(&self) -> ClauseList {
         let mut clauses = ClauseList::new();
         self.derive_rule_clauses().collect_into(&mut clauses);
-        self.derive_inverse_clauses().collect_into(&mut clauses);
         clauses
     }
 
@@ -85,17 +78,7 @@ impl<A: Atom> Aba<A> {
     }
 
     fn derive_rule_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
-        inference_helper::<Inference<_>, _>(self)
-    }
-
-    fn derive_inverse_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
-        self.inverses.iter().map(|(from, to)| {
-            let inverse: Inverse<A> = Inverse {
-                from: from.clone(),
-                to: to.clone(),
-            };
-            Clause::from(vec![inverse.pos()])
-        })
+        inference_helper::<Theory<_>, _>(self)
     }
 
     fn rule_heads(&self) -> impl Iterator<Item = &A> + '_ {
@@ -107,7 +90,7 @@ impl<A: Atom> Aba<A> {
     }
 }
 
-fn body_to_clauses<I: InferenceAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) -> ClauseList {
+fn body_to_clauses<I: TheoryAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) -> ClauseList {
     let mut clauses = vec![];
     let mut left_implication: Clause = body.iter().map(|elem| I::new(elem.clone()).neg()).collect();
     left_implication.push(head.clone().positive());
@@ -118,7 +101,7 @@ fn body_to_clauses<I: InferenceAtom<A>, A: Atom>(head: Literal, body: &HashSet<A
     clauses
 }
 
-pub fn inference_helper<I: InferenceAtom<A> + IntoLiteral, A: Atom>(
+pub fn inference_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
     aba: &Aba<A>,
 ) -> impl Iterator<Item = Clause> + '_ {
     let mut rules_combined =
@@ -148,11 +131,11 @@ pub fn inference_helper<I: InferenceAtom<A> + IntoLiteral, A: Atom>(
                     .iter()
                     .enumerate()
                     .flat_map(|(idx, body)| {
-                        body_to_clauses::<I, _>(I::Helper::new(idx, head.clone()).pos(), body)
+                        body_to_clauses::<I, _>(I::new_helper(idx, head.clone()).pos(), body)
                     })
                     .collect_into(&mut clauses);
                 let helpers: Vec<_> = (0..bodies.len())
-                    .map(|idx| I::Helper::new(idx, head.clone()).pos())
+                    .map(|idx| I::new_helper(idx, head.clone()).pos())
                     .collect();
                 let mut right_implification: Clause = helpers.iter().cloned().collect();
                 right_implification.push(I::new(head.clone()).neg());
@@ -166,16 +149,14 @@ pub fn inference_helper<I: InferenceAtom<A> + IntoLiteral, A: Atom>(
         })
 }
 
-impl<A: Atom> InferenceAtom<A> for Inference<A> {
-    type Helper = InferenceHelper<A>;
+impl<A: Atom> TheoryAtom<A> for Theory<A> {
+    type Helper = TheoryHelper<A>;
 
     fn new(atom: A) -> Self {
         Self(atom)
     }
-}
 
-impl<A: Atom> InferenceAtomHelper<A> for InferenceHelper<A> {
-    fn new(idx: usize, atom: A) -> Self {
-        Self(idx, atom)
+    fn new_helper(idx: usize, atom: A) -> Self::Helper {
+        TheoryHelper(idx, atom)
     }
 }

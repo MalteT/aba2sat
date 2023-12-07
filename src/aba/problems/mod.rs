@@ -24,6 +24,7 @@ pub struct SolverState<'a, A: Atom + 'a> {
     map: &'a Mapper,
 }
 
+#[doc(notable_trait)]
 pub trait Problem<A: Atom> {
     type Output;
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList;
@@ -34,6 +35,7 @@ pub trait Problem<A: Atom> {
     }
 }
 
+#[doc(notable_trait)]
 pub trait MultishotProblem<A: Atom> {
     type Output;
     fn additional_clauses(&self, aba: &Aba<A>, iteration: usize) -> ClauseList;

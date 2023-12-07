@@ -1,9 +1,12 @@
 #![feature(iter_collect_into)]
 #![feature(iter_intersperse)]
+#![feature(doc_notable_trait)]
 
 use std::{collections::HashSet, fmt::Write, fs::read_to_string};
 
-use aba::problems::admissibility::{Admissibility, VerifyAdmissibility};
+use aba::problems::admissibility::{
+    EnumerateAdmissibleExtensions, SampleAdmissibleExtension, VerifyAdmissibleExtension,
+};
 use clap::Parser;
 
 use crate::error::{Error, Result};
@@ -40,7 +43,7 @@ fn __main() -> Result {
     match args.problem {
         args::Problems::VerifyAdmissibility { set } => {
             let result = aba::problems::solve(
-                VerifyAdmissibility {
+                VerifyAdmissibleExtension {
                     assumptions: set.into_iter().collect(),
                 },
                 &aba,
@@ -48,11 +51,12 @@ fn __main() -> Result {
             print_bool_result(result);
         }
         args::Problems::EnumerateAdmissibility => {
-            let result = aba::problems::multishot_solve(Admissibility::default(), &aba)?;
+            let result =
+                aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)?;
             print_witnesses_result(result)?;
         }
         args::Problems::SampleAdmissibility => {
-            let result = aba::problems::solve(Admissibility::default(), &aba)?;
+            let result = aba::problems::solve(SampleAdmissibleExtension, &aba)?;
             print_witness_result(result)?;
         }
     }

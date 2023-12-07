@@ -1,52 +1,45 @@
+use std::collections::HashSet;
+
 use crate::{
-    aba::{Aba, Inference, Inverse},
-    clauses::{Clause, ClauseList},
-    literal::{InferenceAtom, IntoLiteral},
+    aba::{Aba, Theory},
+    clauses::{Atom, Clause, ClauseList},
+    literal::{IntoLiteral, TheoryAtom},
 };
 
 use super::{Problem, SolverState};
 
-pub struct ConflictFreeness {
-    pub assumptions: Vec<char>,
+pub struct ConflictFreeness<A: Atom> {
+    pub assumptions: HashSet<A>,
 }
 
-impl Problem<char> for ConflictFreeness {
+impl<A: Atom> Problem<A> for ConflictFreeness<A> {
     type Output = bool;
 
-    fn additional_clauses(&self, aba: &Aba<char>) -> ClauseList {
+    fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
         let mut clauses = vec![];
         // Make sure that every assumption in our problem is inferred and every other not
-        for elem in self.assumptions.iter().copied() {
-            if aba.inverses.contains_key(&elem) {
-                clauses.push(vec![Inference::new(elem).pos()].into())
+        for assumption in aba.assumptions() {
+            let theory = Theory::new(assumption.clone());
+            if self.assumptions.contains(assumption) {
+                clauses.push(vec![theory.pos()].into())
             } else {
-                clauses.push(vec![Inference::new(elem).neg()].into())
+                clauses.push(vec![theory.neg()].into())
             }
         }
-        // TODO: Minimize this loop
-        for elem in aba.universe().copied() {
-            for assumption in aba.assumptions().copied() {
-                // For every element e in our universe and every assumption a, we cannot have the following:
-                // e is the inverse of a and both are inferred (conflict!)
-                clauses.push(Clause::from(vec![
-                    Inference::new(assumption).neg(),
-                    Inference::new(elem).neg(),
-                    Inverse {
-                        from: assumption,
-                        to: elem,
-                    }
-                    .neg(),
-                ]))
-            }
+        for (assumption, inverse) in &aba.inverses {
+            clauses.push(Clause::from(vec![
+                Theory::new(assumption.clone()).neg(),
+                Theory::new(inverse.clone()).neg(),
+            ]));
         }
         clauses
     }
 
-    fn construct_output(self, state: SolverState<'_, char>) -> Self::Output {
+    fn construct_output(self, state: SolverState<'_, A>) -> Self::Output {
         state.sat_result
     }
 
-    fn check(&self, aba: &Aba<char>) -> bool {
+    fn check(&self, aba: &Aba<A>) -> bool {
         // Make sure that every assumption is part of the ABA
         self.assumptions.iter().all(|a| aba.contains_assumption(a))
     }

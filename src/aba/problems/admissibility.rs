@@ -1,58 +1,68 @@
+//! Everything needed to solve problems around the admissibility semantics.
 use std::collections::HashSet;
 
 use crate::{
-    aba::{inference_helper, Aba, Inference},
+    aba::{inference_helper, Aba, Theory},
     clauses::{Atom, Clause, ClauseList},
-    literal::{InferenceAtom, InferenceAtomHelper, IntoLiteral},
+    literal::{IntoLiteral, TheoryAtom},
 };
 
 use super::{LoopControl, MultishotProblem, Problem, SolverState};
 
+/// Compute all admissible extensions for an [`Aba`]
 #[derive(Default, Debug)]
-pub struct Admissibility<A: Atom> {
+pub struct EnumerateAdmissibleExtensions<A: Atom> {
     found: Vec<HashSet<A>>,
 }
 
-pub struct VerifyAdmissibility<A: Atom> {
+/// Sample an admissible extensions from an [`Aba`].
+/// Will only return the empty set if no other extension is found
+#[derive(Debug, Default)]
+pub struct SampleAdmissibleExtension;
+
+/// Verify wether `assumptions` is an admissible extension of an [`Aba`]
+pub struct VerifyAdmissibleExtension<A: Atom> {
     pub assumptions: Vec<A>,
 }
 
+/// *(Literal)* `A` is element of `th(S)`
 #[derive(Debug)]
-pub struct SetInference<A: Atom>(A);
+pub struct SetTheory<A: Atom>(A);
 
+/// Helper for [`SetTheory`]
 #[derive(Debug)]
-pub struct SetInferenceHelper<A: Atom>(usize, A);
+pub struct SetTheoryHelper<A: Atom>(usize, A);
 
 fn initial_clauses<A: Atom>(aba: &Aba<A>) -> ClauseList {
     let mut clauses = vec![];
     // Create inference for the problem set
-    inference_helper::<SetInference<_>, _>(aba).collect_into(&mut clauses);
+    inference_helper::<SetTheory<_>, _>(aba).collect_into(&mut clauses);
     // Attack the inference of the aba, if an attack exists
     for (assumption, inverse) in &aba.inverses {
         [
             // For any assumption `a` and it's inverse `b`:
             //   Inference(a) <=> not SetInference(b)
             Clause::from(vec![
-                Inference::new(assumption.clone()).pos(),
-                SetInference::new(inverse.clone()).pos(),
+                Theory::new(assumption.clone()).pos(),
+                SetTheory::new(inverse.clone()).pos(),
             ]),
             Clause::from(vec![
-                Inference::new(assumption.clone()).neg(),
-                SetInference::new(inverse.clone()).neg(),
+                Theory::new(assumption.clone()).neg(),
+                SetTheory::new(inverse.clone()).neg(),
             ]),
             // Prevent attacks from the opponent to the selected set
             // For any assumption `a` and it's inverse `b`:
             //   Inference(b) and SetInference(a) => bottom
             Clause::from(vec![
-                Inference::new(inverse.clone()).neg(),
-                SetInference::new(assumption.clone()).neg(),
+                Theory::new(inverse.clone()).neg(),
+                SetTheory::new(assumption.clone()).neg(),
             ]),
             // Prevent self-attacks
             // For any assumption `a` and it's inverse `b`:
             //   SetInference(a) and SetInference(b) => bottom
             Clause::from(vec![
-                SetInference::new(assumption.clone()).neg(),
-                SetInference::new(inverse.clone()).neg(),
+                SetTheory::new(assumption.clone()).neg(),
+                SetTheory::new(inverse.clone()).neg(),
             ]),
         ]
         .into_iter()
@@ -68,7 +78,7 @@ fn construct_found_set<A: Atom>(state: SolverState<'_, A>) -> HashSet<A> {
         .inverses
         .keys()
         .filter_map(|assumption| {
-            let literal = SetInference::new(assumption.clone()).pos();
+            let literal = SetTheory::new(assumption.clone()).pos();
             let raw = state.map.get_raw(&literal)?;
             match state.solver.value(raw) {
                 Some(true) => Some(assumption.clone()),
@@ -78,7 +88,7 @@ fn construct_found_set<A: Atom>(state: SolverState<'_, A>) -> HashSet<A> {
         .collect()
 }
 
-impl<A: Atom> Problem<A> for Admissibility<A> {
+impl<A: Atom> Problem<A> for SampleAdmissibleExtension {
     type Output = HashSet<A>;
 
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
@@ -87,7 +97,7 @@ impl<A: Atom> Problem<A> for Admissibility<A> {
         let no_empty_set: Clause = aba
             .inverses
             .keys()
-            .map(|assumption| SetInference::new(assumption.clone()).pos())
+            .map(|assumption| SetTheory::new(assumption.clone()).pos())
             .collect();
         clauses.push(no_empty_set);
         clauses
@@ -102,7 +112,7 @@ impl<A: Atom> Problem<A> for Admissibility<A> {
     }
 }
 
-impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
+impl<A: Atom> MultishotProblem<A> for EnumerateAdmissibleExtensions<A> {
     type Output = Vec<HashSet<A>>;
 
     fn additional_clauses(&self, aba: &Aba<A>, iteration: usize) -> ClauseList {
@@ -113,7 +123,7 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
                 let no_empty_set: Clause = aba
                     .inverses
                     .keys()
-                    .map(|assumption| SetInference::new(assumption.clone()).pos())
+                    .map(|assumption| SetTheory::new(assumption.clone()).pos())
                     .collect();
                 clauses.push(no_empty_set);
                 clauses
@@ -128,9 +138,9 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
                     .keys()
                     .map(|assumption| {
                         if just_found.contains(assumption) {
-                            SetInference::new(assumption.clone()).neg()
+                            SetTheory::new(assumption.clone()).neg()
                         } else {
-                            SetInference::new(assumption.clone()).pos()
+                            SetTheory::new(assumption.clone()).pos()
                         }
                     })
                     .collect();
@@ -149,7 +159,7 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
             .inverses
             .keys()
             .filter_map(|assumption| {
-                let literal = SetInference::new(assumption.clone()).pos();
+                let literal = SetTheory::new(assumption.clone()).pos();
                 let raw = state.map.get_raw(&literal)?;
                 match state.solver.value(raw) {
                     Some(true) => Some(assumption.clone()),
@@ -172,14 +182,14 @@ impl<A: Atom> MultishotProblem<A> for Admissibility<A> {
     }
 }
 
-impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
+impl<A: Atom> Problem<A> for VerifyAdmissibleExtension<A> {
     type Output = bool;
 
     fn additional_clauses(&self, aba: &Aba<A>) -> crate::clauses::ClauseList {
         let mut clauses = initial_clauses(aba);
         // Force inference on all members of the set
         for assumption in aba.assumptions() {
-            let inf = SetInference::new(assumption.clone());
+            let inf = SetTheory::new(assumption.clone());
             if self.assumptions.contains(assumption) {
                 clauses.push(Clause::from(vec![inf.pos()]))
             } else {
@@ -199,16 +209,14 @@ impl<A: Atom> Problem<A> for VerifyAdmissibility<A> {
     }
 }
 
-impl<A: Atom> InferenceAtom<A> for SetInference<A> {
-    type Helper = SetInferenceHelper<A>;
+impl<A: Atom> TheoryAtom<A> for SetTheory<A> {
+    type Helper = SetTheoryHelper<A>;
 
     fn new(atom: A) -> Self {
         Self(atom)
     }
-}
 
-impl<A: Atom> InferenceAtomHelper<A> for SetInferenceHelper<A> {
-    fn new(idx: usize, atom: A) -> Self {
-        Self(idx, atom)
+    fn new_helper(idx: usize, atom: A) -> Self::Helper {
+        SetTheoryHelper(idx, atom)
     }
 }
