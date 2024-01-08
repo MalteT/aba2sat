@@ -64,15 +64,14 @@ fn __main() -> Result {
             aba::problems::solve(SampleAdmissibleExtension, &aba)?.fmt_iccma()
         }
         args::Problems::DecideCredulousAdmissibility { query } => {
-            aba::problems::solve(DecideCredulousAdmissibility { assumption: query }, &aba)?
-                .fmt_iccma()
+            aba::problems::solve(DecideCredulousAdmissibility { element: query }, &aba)?.fmt_iccma()
         }
         args::Problems::EnumerateComplete => {
             aba::problems::multishot_solve(EnumerateCompleteExtensions::default(), &aba)?
                 .fmt_iccma()
         }
         args::Problems::DecideCredulousComplete { query } => {
-            aba::problems::solve(DecideCredulousComplete { assumption: query }, &aba)?.fmt_iccma()
+            aba::problems::solve(DecideCredulousComplete { element: query }, &aba)?.fmt_iccma()
         }
     }?;
     let mut stdout = std::io::stdout().lock();

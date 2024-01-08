@@ -20,7 +20,7 @@ pub struct EnumerateCompleteExtensions<A> {
 
 /// Decide whether `assumption` is credulously complete in an [`Aba`]
 pub struct DecideCredulousComplete<A> {
-    pub assumption: A,
+    pub element: A,
 }
 
 fn initial_complete_clauses<A: Atom>(aba: &Aba<A>) -> ClauseList {
@@ -101,7 +101,7 @@ impl<A: Atom> Problem<A> for DecideCredulousComplete<A> {
 
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
         let mut clauses = initial_complete_clauses(aba);
-        clauses.push(Clause::from(vec![SetTheory(self.assumption.clone()).pos()]));
+        clauses.push(Clause::from(vec![SetTheory(self.element.clone()).pos()]));
         clauses
     }
 
@@ -110,12 +110,12 @@ impl<A: Atom> Problem<A> for DecideCredulousComplete<A> {
     }
 
     fn check(&self, aba: &Aba<A>) -> Result {
-        if aba.has_assumption(&self.assumption) {
+        if aba.has_element(&self.element) {
             Ok(())
         } else {
             Err(Error::ProblemCheckFailed(format!(
-                "Assumption {:?} not present in ABA framework",
-                self.assumption
+                "Element {:?} not present in ABA framework",
+                self.element
             )))
         }
     }

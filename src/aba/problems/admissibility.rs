@@ -29,7 +29,7 @@ pub struct VerifyAdmissibleExtension<A: Atom> {
 
 /// Decide whether `assumption` is credulously admissible in an [`Aba`]
 pub struct DecideCredulousAdmissibility<A> {
-    pub assumption: A,
+    pub element: A,
 }
 
 pub fn initial_admissibility_clauses<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> ClauseList {
@@ -222,7 +222,7 @@ impl<A: Atom> Problem<A> for DecideCredulousAdmissibility<A> {
 
     fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
         let mut clauses = initial_admissibility_clauses::<SetTheory<_>, _>(aba);
-        clauses.push(Clause::from(vec![SetTheory(self.assumption.clone()).pos()]));
+        clauses.push(Clause::from(vec![SetTheory(self.element.clone()).pos()]));
         clauses
     }
 
@@ -231,12 +231,12 @@ impl<A: Atom> Problem<A> for DecideCredulousAdmissibility<A> {
     }
 
     fn check(&self, aba: &Aba<A>) -> Result {
-        if aba.has_assumption(&self.assumption) {
+        if aba.has_assumption(&self.element) {
             Ok(())
         } else {
             Err(Error::ProblemCheckFailed(format!(
                 "Assumption {:?} not present in ABA framework",
-                self.assumption
+                self.element
             )))
         }
     }

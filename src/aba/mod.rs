@@ -88,6 +88,10 @@ impl<A: Atom> Aba<A> {
     fn has_assumption(&self, atom: &A) -> bool {
         self.inverses.contains_key(atom)
     }
+
+    fn has_element(&self, element: &A) -> bool {
+        self.universe().any(|e| element == e)
+    }
 }
 
 fn body_to_clauses<I: TheoryAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) -> ClauseList {
