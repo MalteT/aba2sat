@@ -126,6 +126,7 @@
             pkgs.nil
             rustToolchain
             rename
+            self'.packages.aspforaba
           ];
           RUST_LOG = "trace";
         };
