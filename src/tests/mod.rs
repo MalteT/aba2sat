@@ -105,3 +105,30 @@ fn simple_admissible_example_with_defense() {
         );
     }
 }
+
+#[test]
+fn a_chain_with_no_beginning() {
+    // found this while grinding against ASPforABA (5aa9201)
+    let aba = Aba::new()
+        .with_assumption('a', 'b')
+        .with_assumption('b', 'c')
+        .with_rule('c', ['a', 'd'])
+        .with_rule('d', ['c']);
+    let expected: Vec<HashSet<char>> = vec![set!(), set!('b')];
+    // 'a' cannot be defended against b since c is not derivable
+    let result =
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+            .unwrap();
+    for elem in &expected {
+        assert!(
+            result.contains(elem),
+            "{elem:?} was expected but not found in result"
+        );
+    }
+    for elem in &result {
+        assert!(
+            expected.contains(elem),
+            "{elem:?} was found in the result, but is not expected!"
+        );
+    }
+}
