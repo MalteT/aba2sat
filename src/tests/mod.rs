@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use crate::aba::{
     problems::{
-        admissibility::{EnumerateAdmissibleExtensions, VerifyAdmissibleExtension},
+        admissibility::{
+            DecideCredulousAdmissibility, EnumerateAdmissibleExtensions, VerifyAdmissibleExtension,
+        },
         conflict_free::ConflictFreeness,
     },
     Aba,
@@ -89,6 +91,33 @@ fn simple_admissible_example() {
 fn simple_admissible_example_with_defense() {
     let aba = simple_aba_example_1().with_rule('t', vec!['a', 'b']);
     let expected: Vec<HashSet<char>> = vec![set!(), set!('a', 'b'), set!('b'), set!('b', 'c')];
+    let result =
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+            .unwrap();
+    for elem in &expected {
+        assert!(
+            result.contains(elem),
+            "{elem:?} was expected but not found in result"
+        );
+    }
+    for elem in &result {
+        assert!(
+            expected.contains(elem),
+            "{elem:?} was found in the result, but is not expected!"
+        );
+    }
+}
+
+#[test]
+fn simple_admissible_atomic() {
+    let aba = Aba::new()
+        .with_assumption('a', 'p')
+        .with_assumption('b', 'q')
+        .with_assumption('c', 'r')
+        .with_rule('p', ['b'])
+        .with_rule('q', ['a', 'c']);
+    let expected: Vec<HashSet<char>> =
+        vec![set!(), set!('b'), set!('c'), set!('a', 'c'), set!('b', 'c')];
     let result =
         crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
             .unwrap();
