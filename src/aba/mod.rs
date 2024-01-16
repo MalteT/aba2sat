@@ -1,3 +1,30 @@
+//! # Assumption-based Argumentation
+//!
+//! All relevant tools for solving problems around assumption-based argumentation.
+//!
+//! ## Example
+//! ```
+//! # use aba2sat::aba::Aba;
+//! # use aba2sat::aba::problems::solve;
+//! # use aba2sat::aba::problems::admissibility::VerifyAdmissibleExtension;
+//! let aba =
+//!     // Start with an empty framework
+//!     Aba::default()
+//!         // Add an assumption 'a' with inverse 'p'
+//!         .with_assumption('a', 'p')
+//!         // Add an assumption 'b' with inverse 'q'
+//!         .with_assumption('b', 'q')
+//!         // Add a rule to derive 'p' (the inverse of 'a') from 'b'
+//!         .with_rule('p', ['b']);
+//!
+//!
+//! // Solve the problem whether the set of assumptions {'b'} is admissible
+//! let result =
+//!     solve(VerifyAdmissibleExtension { assumptions: vec!['b'] }, &aba).unwrap();
+//!
+//! // The result should be true
+//! assert!(result)
+//! ```
 use std::collections::{HashMap, HashSet};
 
 use crate::{
@@ -7,9 +34,12 @@ use crate::{
 
 pub mod problems;
 
-#[derive(Debug, Default, PartialEq)]
+pub type Rule<A> = (A, HashSet<A>);
+pub type RuleList<A> = Vec<Rule<A>>;
+
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Aba<A: Atom> {
-    pub rules: Vec<(A, HashSet<A>)>,
+    pub rules: RuleList<A>,
     pub inverses: HashMap<A, A>,
 }
 
@@ -20,14 +50,6 @@ pub struct Theory<A: Atom>(A);
 pub struct TheoryHelper<A: Atom>(usize, A);
 
 impl<A: Atom> Aba<A> {
-    #[cfg(test)]
-    pub fn new() -> Self {
-        Aba {
-            rules: vec![],
-            inverses: HashMap::new(),
-        }
-    }
-
     pub fn with_assumption(mut self, assumption: A, inverse: A) -> Self {
         self.inverses.insert(assumption, inverse);
         self
@@ -55,9 +77,7 @@ impl<A: Atom> Aba<A> {
         self.inverses.contains_key(a)
     }
 
-    /**
-     * Translate the ABA into base rules / definitions for SAT solving
-     */
+    /// Translate the ABA into base rules / definitions for SAT solving
     pub fn derive_clauses(&self) -> ClauseList {
         let mut clauses = ClauseList::new();
         self.derive_rule_clauses().collect_into(&mut clauses);
@@ -75,6 +95,37 @@ impl<A: Atom> Aba<A> {
             .chain(inverses)
             .collect::<HashSet<_>>()
             .len()
+    }
+
+    /// Filtered list of rules
+    ///
+    /// Iterates over all rules, marking reachable elements until
+    /// no additional rule can be applied. Then removes every
+    /// rule that contains any unreachable atom and returns the rest
+    pub fn trim(&mut self) {
+        // Begin with all assumptions marked as reachable
+        let mut reachable: HashSet<_> = self.assumptions().cloned().collect();
+        // Calculate all reachable elements
+        loop {
+            let mut marked_any = false;
+            for (head, body) in &self.rules {
+                if reachable.contains(head) {
+                    continue;
+                }
+                if body.iter().all(|atom| reachable.contains(atom)) {
+                    marked_any = true;
+                    reachable.insert(head.clone());
+                }
+            }
+            if !marked_any {
+                break;
+            }
+        }
+        // Remove all rules that contain any unreachable atom
+        self.rules.retain(|(head, body)| {
+            // Both the head and all elements from the body must be reachable
+            reachable.contains(head) && body.iter().all(|atom| reachable.contains(atom))
+        });
     }
 
     fn derive_rule_clauses(&self) -> impl Iterator<Item = Clause> + '_ {

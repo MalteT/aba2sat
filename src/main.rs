@@ -53,25 +53,24 @@ fn __main() -> Result {
             VerifyAdmissibleExtension {
                 assumptions: set.into_iter().collect(),
             },
-            &aba,
+            aba,
         )?
         .fmt_iccma(),
         args::Problems::EnumerateAdmissibility => {
-            aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)?
+            aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)?
                 .fmt_iccma()
         }
         args::Problems::SampleAdmissibility => {
-            aba::problems::solve(SampleAdmissibleExtension, &aba)?.fmt_iccma()
+            aba::problems::solve(SampleAdmissibleExtension, aba)?.fmt_iccma()
         }
         args::Problems::DecideCredulousAdmissibility { query } => {
-            aba::problems::solve(DecideCredulousAdmissibility { element: query }, &aba)?.fmt_iccma()
+            aba::problems::solve(DecideCredulousAdmissibility { element: query }, aba)?.fmt_iccma()
         }
         args::Problems::EnumerateComplete => {
-            aba::problems::multishot_solve(EnumerateCompleteExtensions::default(), &aba)?
-                .fmt_iccma()
+            aba::problems::multishot_solve(EnumerateCompleteExtensions::default(), aba)?.fmt_iccma()
         }
         args::Problems::DecideCredulousComplete { query } => {
-            aba::problems::solve(DecideCredulousComplete { element: query }, &aba)?.fmt_iccma()
+            aba::problems::solve(DecideCredulousComplete { element: query }, aba)?.fmt_iccma()
         }
     }?;
     let mut stdout = std::io::stdout().lock();

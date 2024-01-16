@@ -2,16 +2,14 @@ use std::collections::HashSet;
 
 use crate::aba::{
     problems::{
-        admissibility::{
-            DecideCredulousAdmissibility, EnumerateAdmissibleExtensions, VerifyAdmissibleExtension,
-        },
+        admissibility::{EnumerateAdmissibleExtensions, VerifyAdmissibleExtension},
         conflict_free::ConflictFreeness,
     },
     Aba,
 };
 
 fn simple_aba_example_1() -> Aba<char> {
-    Aba::new()
+    Aba::default()
         .with_assumption('a', 'r')
         .with_assumption('b', 's')
         .with_assumption('c', 't')
@@ -39,7 +37,7 @@ fn simple_conflict_free_verification() {
         .for_each(|(assumptions, expectation)| {
             eprintln!("Checking set {assumptions:?}");
             let result =
-                crate::aba::problems::solve(ConflictFreeness { assumptions }, &aba).unwrap();
+                crate::aba::problems::solve(ConflictFreeness { assumptions }, aba.clone()).unwrap();
             assert!(result == expectation);
         })
 }
@@ -58,7 +56,7 @@ fn simple_admissible_verification() {
         .for_each(|(assumptions, expectation)| {
             eprintln!("Checking set {assumptions:?}");
             let result =
-                crate::aba::problems::solve(VerifyAdmissibleExtension { assumptions: assumptions.clone() }, &aba).unwrap();
+                crate::aba::problems::solve(VerifyAdmissibleExtension { assumptions: assumptions.clone() }, aba.clone()).unwrap();
             assert!(
                 result == expectation,
                 "Expected {expectation} from solver, but got {result} while checking {assumptions:?}"
@@ -71,7 +69,7 @@ fn simple_admissible_example() {
     let aba = simple_aba_example_1();
     let expected: Vec<HashSet<char>> = vec![set!(), set!('b'), set!('b', 'c'), set!('c')];
     let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
             .unwrap();
     for elem in &expected {
         assert!(
@@ -92,7 +90,7 @@ fn simple_admissible_example_with_defense() {
     let aba = simple_aba_example_1().with_rule('t', vec!['a', 'b']);
     let expected: Vec<HashSet<char>> = vec![set!(), set!('a', 'b'), set!('b'), set!('b', 'c')];
     let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
             .unwrap();
     for elem in &expected {
         assert!(
@@ -110,7 +108,7 @@ fn simple_admissible_example_with_defense() {
 
 #[test]
 fn simple_admissible_atomic() {
-    let aba = Aba::new()
+    let aba = Aba::default()
         .with_assumption('a', 'p')
         .with_assumption('b', 'q')
         .with_assumption('c', 'r')
@@ -119,7 +117,7 @@ fn simple_admissible_atomic() {
     let expected: Vec<HashSet<char>> =
         vec![set!(), set!('b'), set!('c'), set!('a', 'c'), set!('b', 'c')];
     let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
             .unwrap();
     for elem in &expected {
         assert!(
@@ -138,7 +136,7 @@ fn simple_admissible_atomic() {
 #[test]
 fn a_chain_with_no_beginning() {
     // found this while grinding against ASPforABA (5aa9201)
-    let aba = Aba::new()
+    let aba = Aba::default()
         .with_assumption('a', 'b')
         .with_assumption('b', 'c')
         .with_rule('c', ['a', 'd'])
@@ -146,7 +144,7 @@ fn a_chain_with_no_beginning() {
     let expected: Vec<HashSet<char>> = vec![set!(), set!('b')];
     // 'a' cannot be defended against b since c is not derivable
     let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), &aba)
+        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
             .unwrap();
     for elem in &expected {
         assert!(
