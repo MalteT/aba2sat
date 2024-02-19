@@ -159,7 +159,28 @@ fn body_to_clauses<I: TheoryAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) 
 /// Generate the logic for theory derivation in the given [`Aba`]
 ///
 /// This will need a valid [`TheoryAtom`] that will be used to construct the logic
-// TODO: describe how this is done
+///
+/// # Explanation
+///
+/// We will mainly operate on heads of rules here. So consider head `p` and all bodies `b`
+/// in the set of all bodies of `p`: `bodies(p)`.
+/// Every body `b` in `bodies(p)` is a set of atoms. Any set of atoms (any body) can be
+/// used to derive `p`. So the following relation must hold:
+/// - if `p` is true, at least one body `b` must be true aswell.
+///   this only holds, because `p` itself is not assumption (since we're
+///   only talking flat ABA)
+/// - if `b` in `bodies(p)` is true, `p` must be true aswell
+///
+/// The entire logic in this function is required to implement this equality in DNF.
+///
+/// # Extra steps
+///
+/// - We do some extra work here to prevent atoms that never occur in the head of rule and
+/// are not an assumption from ever being true.
+/// - heads with a single body are common enough in practice to benefit from special care.
+///   A lot of the overhead is due to the fact that multiple bodies are an option, if that's
+///   not given for a head `p` we use the simplified translation logic where `p` is true iff
+///   `bodies(p)` is true.
 pub fn theory_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
     aba: &Aba<A>,
 ) -> impl Iterator<Item = Clause> + '_ {
