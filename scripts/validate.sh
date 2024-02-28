@@ -16,7 +16,7 @@ print_help_and_exit() {
   printf "          The additional argument for the problem\n"
   printf "  -f, --file\n"
   printf "          The file containing the problem in ABA format\n"
-  printf "  --file-dir\n"
+  printf "  --files-from\n"
   printf "          Use the following dir to read files, specify a single file with --file instead\n"
   exit 1
 }
@@ -43,7 +43,7 @@ run_dc_co() {
 
 POSITIONAL_ARGS=()
 ASPFORABA=ASPforABA
-ABA2SAT=aba2sat
+ABA2SAT=result/bin/aba2sat
 ABA_FILE=
 ABA_FILE_DIR=
 ABA_FILE_EXT=aba

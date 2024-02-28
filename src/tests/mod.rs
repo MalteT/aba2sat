@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use crate::aba::{
     problems::{
         admissibility::{EnumerateAdmissibleExtensions, VerifyAdmissibleExtension},
+        complete::{DecideCredulousComplete, EnumerateCompleteExtensions},
         conflict_free::ConflictFreeness,
     },
     Aba,
@@ -158,4 +159,17 @@ fn a_chain_with_no_beginning() {
             "{elem:?} was found in the result, but is not expected!"
         );
     }
+}
+
+#[test]
+fn loops_and_conflicts() {
+    let aba = Aba::default()
+        .with_assumption('a', 'b')
+        .with_rule('b', ['a'])
+        .with_rule('b', ['c'])
+        .with_rule('c', ['b'])
+        .with_rule('d', ['b']);
+    let result =
+        crate::aba::problems::solve(DecideCredulousComplete { element: 'd' }, aba).unwrap();
+    assert!(!result, "d cannot be credulous complete");
 }

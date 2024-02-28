@@ -81,6 +81,11 @@ pub fn solve<A: Atom, P: Problem<A>>(problem: P, mut aba: Aba<A>) -> Result<P::O
         .for_each(|raw| sat.add_clause(raw));
     // A single solver call to determine the solution
     if let Some(sat_result) = sat.solve() {
+        #[cfg(debug_assertions)]
+        if sat_result {
+            let rec = map.reconstruct(&sat).collect::<Vec<_>>();
+            eprintln!("{rec:#?}");
+        }
         // If the solver didn't panic, convert our result into the output
         // using our problem instance
         Ok(problem.construct_output(SolverState {
