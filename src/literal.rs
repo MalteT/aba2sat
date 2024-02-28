@@ -42,13 +42,13 @@ impl<T: Any + Debug + Sized> IntoLiteral for T {
 /// the theory of a (sub-)set of assumptions (`th(S)`) in an [`Aba`](crate::aba::Aba).
 ///
 /// See [`crate::aba::theory_helper`].
-pub trait TheoryAtom<A: Atom>: Sized + IntoLiteral {
-    /// Helper type
-    type Helper: IntoLiteral;
-    /// Construct this [`Literal`]
+pub trait TheoryAtom<A: Atom>: Sized + IntoLiteral + std::fmt::Debug + 'static {
     fn new(atom: A) -> Self;
-    /// Construct the helper [`Literal`]
-    fn new_helper(idx: usize, atom: A) -> Self::Helper;
+}
+impl<A: Atom, T: From<A> + Sized + IntoLiteral + std::fmt::Debug + 'static> TheoryAtom<A> for T {
+    fn new(atom: A) -> Self {
+        Self::from(atom)
+    }
 }
 
 impl Literal {

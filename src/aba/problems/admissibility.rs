@@ -32,7 +32,9 @@ pub struct DecideCredulousAdmissibility<A> {
     pub element: A,
 }
 
-pub fn initial_admissibility_clauses<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> ClauseList {
+pub fn initial_admissibility_clauses<I: std::fmt::Debug + 'static + TheoryAtom<A>, A: Atom>(
+    aba: &Aba<A>,
+) -> ClauseList {
     let mut clauses = vec![];
     // Create inference for the problem set
     theory_helper::<I, _>(aba).collect_into(&mut clauses);

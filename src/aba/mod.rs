@@ -25,7 +25,10 @@
 //! // The result should be true
 //! assert!(result)
 //! ```
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+};
 
 use crate::{
     clauses::{Atom, Clause, ClauseList},
@@ -46,8 +49,11 @@ pub struct Aba<A: Atom> {
 #[derive(Debug)]
 pub struct Theory<A: Atom>(A);
 
-#[derive(Debug)]
-pub struct TheoryHelper<A: Atom>(usize, A);
+impl<A: Atom> From<A> for Theory<A> {
+    fn from(value: A) -> Self {
+        Self(value)
+    }
+}
 
 impl<A: Atom> Aba<A> {
     pub fn with_assumption(mut self, assumption: A, inverse: A) -> Self {
@@ -181,9 +187,7 @@ fn body_to_clauses<I: TheoryAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) 
 ///   A lot of the overhead is due to the fact that multiple bodies are an option, if that's
 ///   not given for a head `p` we use the simplified translation logic where `p` is true iff
 ///   `bodies(p)` is true.
-pub fn theory_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
-    aba: &Aba<A>,
-) -> impl Iterator<Item = Clause> + '_ {
+pub fn theory_helper<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> impl Iterator<Item = Clause> + '_ {
     // The combined list of rules, such that every
     // head is unique and possible contains a list of bodies
     let mut rules_combined =
@@ -222,11 +226,14 @@ pub fn theory_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
                     .iter()
                     .enumerate()
                     .flat_map(|(idx, body)| {
-                        body_to_clauses::<I, _>(I::new_helper(idx, head.clone()).pos(), body)
+                        body_to_clauses::<I, _>(
+                            TheoryHelper::<I, _>::new(idx, head.clone()).pos(),
+                            body,
+                        )
                     })
                     .collect_into(&mut clauses);
                 let helpers: Vec<_> = (0..bodies.len())
-                    .map(|idx| I::new_helper(idx, head.clone()).pos())
+                    .map(|idx| TheoryHelper::<I, _>::new(idx, head.clone()).pos())
                     .collect();
                 let mut right_implification: Clause = helpers.iter().cloned().collect();
                 right_implification.push(I::new(head.clone()).neg());
@@ -240,14 +247,19 @@ pub fn theory_helper<I: TheoryAtom<A> + IntoLiteral, A: Atom>(
         })
 }
 
-impl<A: Atom> TheoryAtom<A> for Theory<A> {
-    type Helper = TheoryHelper<A>;
+#[derive(Debug)]
+struct TheoryHelper<T: TheoryAtom<A>, A: Atom> {
+    _idx: usize,
+    _atom: A,
+    inner: PhantomData<T>,
+}
 
-    fn new(atom: A) -> Self {
-        Self(atom)
-    }
-
-    fn new_helper(idx: usize, atom: A) -> Self::Helper {
-        TheoryHelper(idx, atom)
+impl<T: TheoryAtom<A>, A: Atom> TheoryHelper<T, A> {
+    fn new(idx: usize, atom: A) -> Self {
+        Self {
+            _idx: idx,
+            _atom: atom,
+            inner: PhantomData,
+        }
     }
 }
