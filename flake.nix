@@ -90,7 +90,6 @@
             ];
             RUST_LOG = "trace";
           };
-          devShells.pre-commit = config.pre-commit.devShell;
         };
     };
 }

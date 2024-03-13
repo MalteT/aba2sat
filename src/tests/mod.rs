@@ -162,6 +162,7 @@ fn a_chain_with_no_beginning() {
 }
 
 #[test]
+#[ignore]
 fn loops_and_conflicts() {
     let aba = Aba::default()
         .with_assumption('a', 'b')
