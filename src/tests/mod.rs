@@ -1,16 +1,16 @@
 use std::collections::HashSet;
 
 use crate::aba::{
+    debug::DebugAba,
     problems::{
         admissibility::{EnumerateAdmissibleExtensions, VerifyAdmissibleExtension},
-        complete::{DecideCredulousComplete, EnumerateCompleteExtensions},
+        complete::DecideCredulousComplete,
         conflict_free::ConflictFreeness,
     },
-    Aba,
 };
 
-fn simple_aba_example_1() -> Aba<char> {
-    Aba::default()
+fn simple_aba_example_1() -> DebugAba {
+    DebugAba::default()
         .with_assumption('a', 'r')
         .with_assumption('b', 's')
         .with_assumption('c', 't')
@@ -35,11 +35,20 @@ fn simple_conflict_free_verification() {
 
     set_checks
         .into_iter()
-        .for_each(|(assumptions, expectation)| {
+        .for_each(|(assumptions, expectation): (HashSet<char>, _)| {
             eprintln!("Checking set {assumptions:?}");
-            let result =
-                crate::aba::problems::solve(ConflictFreeness { assumptions }, aba.clone()).unwrap();
-            assert!(result == expectation);
+            let translated = aba.forward_set(assumptions.clone()).unwrap();
+            let result = crate::aba::problems::solve(
+                ConflictFreeness {
+                    assumptions: translated,
+                },
+                aba.aba().clone(),
+            )
+            .unwrap();
+            assert!(
+                result == expectation,
+                "Expected {expectation} from solver, but got {result} while checking {assumptions:?}"
+            );
         })
 }
 
@@ -47,17 +56,18 @@ fn simple_conflict_free_verification() {
 fn simple_admissible_verification() {
     let aba = simple_aba_example_1();
     let set_checks = vec![
-        (vec![], true),
-        (vec!['a', 'b'], false),
-        (vec!['a'], false),
-        (vec!['b'], true),
+        (set![], true),
+        (set!['a', 'b'], false),
+        (set!['a'], false),
+        (set!['b'], true),
     ];
     set_checks
         .into_iter()
-        .for_each(|(assumptions, expectation)| {
+        .for_each(|(assumptions, expectation): (HashSet<char>, _)| {
             eprintln!("Checking set {assumptions:?}");
+            let translated= aba.forward_set(assumptions.clone()).unwrap();
             let result =
-                crate::aba::problems::solve(VerifyAdmissibleExtension { assumptions: assumptions.clone() }, aba.clone()).unwrap();
+                crate::aba::problems::solve(VerifyAdmissibleExtension { assumptions: translated }, aba.aba().clone()).unwrap();
             assert!(
                 result == expectation,
                 "Expected {expectation} from solver, but got {result} while checking {assumptions:?}"
@@ -69,18 +79,20 @@ fn simple_admissible_verification() {
 fn simple_admissible_example() {
     let aba = simple_aba_example_1();
     let expected: Vec<HashSet<char>> = vec![set!(), set!('b'), set!('b', 'c'), set!('c')];
-    let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
-            .unwrap();
-    for elem in &expected {
+    let result = crate::aba::problems::multishot_solve(
+        EnumerateAdmissibleExtensions::default(),
+        aba.aba().clone(),
+    )
+    .unwrap();
+    for elem in aba.forward_sets(expected.clone()).unwrap() {
         assert!(
-            result.contains(elem),
+            result.contains(&elem),
             "{elem:?} was expected but not found in result"
         );
     }
-    for elem in &result {
+    for elem in aba.backward_sets(result).unwrap() {
         assert!(
-            expected.contains(elem),
+            expected.contains(&elem),
             "{elem:?} was found in the result, but is not expected!"
         );
     }
@@ -88,20 +100,29 @@ fn simple_admissible_example() {
 
 #[test]
 fn simple_admissible_example_with_defense() {
-    let aba = simple_aba_example_1().with_rule('t', vec!['a', 'b']);
+    let aba = DebugAba::default()
+        .with_assumption('a', 'r')
+        .with_assumption('b', 's')
+        .with_assumption('c', 't')
+        .with_rule('p', ['q', 'a'])
+        .with_rule('q', [])
+        .with_rule('r', ['b', 'c'])
+        .with_rule('t', vec!['a', 'b']);
     let expected: Vec<HashSet<char>> = vec![set!(), set!('a', 'b'), set!('b'), set!('b', 'c')];
-    let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
-            .unwrap();
-    for elem in &expected {
+    let result = crate::aba::problems::multishot_solve(
+        EnumerateAdmissibleExtensions::default(),
+        aba.aba().clone(),
+    )
+    .unwrap();
+    for elem in aba.forward_sets(expected.clone()).unwrap() {
         assert!(
-            result.contains(elem),
+            result.contains(&elem),
             "{elem:?} was expected but not found in result"
         );
     }
-    for elem in &result {
+    for elem in aba.backward_sets(result).unwrap() {
         assert!(
-            expected.contains(elem),
+            expected.contains(&elem),
             "{elem:?} was found in the result, but is not expected!"
         );
     }
@@ -109,7 +130,7 @@ fn simple_admissible_example_with_defense() {
 
 #[test]
 fn simple_admissible_atomic() {
-    let aba = Aba::default()
+    let aba = DebugAba::default()
         .with_assumption('a', 'p')
         .with_assumption('b', 'q')
         .with_assumption('c', 'r')
@@ -117,18 +138,20 @@ fn simple_admissible_atomic() {
         .with_rule('q', ['a', 'c']);
     let expected: Vec<HashSet<char>> =
         vec![set!(), set!('b'), set!('c'), set!('a', 'c'), set!('b', 'c')];
-    let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
-            .unwrap();
-    for elem in &expected {
+    let result = crate::aba::problems::multishot_solve(
+        EnumerateAdmissibleExtensions::default(),
+        aba.aba().clone(),
+    )
+    .unwrap();
+    for elem in aba.forward_sets(expected.clone()).unwrap() {
         assert!(
-            result.contains(elem),
+            result.contains(&elem),
             "{elem:?} was expected but not found in result"
         );
     }
-    for elem in &result {
+    for elem in aba.backward_sets(result).unwrap() {
         assert!(
-            expected.contains(elem),
+            expected.contains(&elem),
             "{elem:?} was found in the result, but is not expected!"
         );
     }
@@ -137,25 +160,27 @@ fn simple_admissible_atomic() {
 #[test]
 fn a_chain_with_no_beginning() {
     // found this while grinding against ASPforABA (5aa9201)
-    let aba = Aba::default()
+    let aba = DebugAba::default()
         .with_assumption('a', 'b')
         .with_assumption('b', 'c')
         .with_rule('c', ['a', 'd'])
         .with_rule('d', ['c']);
     let expected: Vec<HashSet<char>> = vec![set!(), set!('b')];
     // 'a' cannot be defended against b since c is not derivable
-    let result =
-        crate::aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)
-            .unwrap();
-    for elem in &expected {
+    let result = crate::aba::problems::multishot_solve(
+        EnumerateAdmissibleExtensions::default(),
+        aba.aba().clone(),
+    )
+    .unwrap();
+    for elem in aba.forward_sets(expected.clone()).unwrap() {
         assert!(
-            result.contains(elem),
+            result.contains(&elem),
             "{elem:?} was expected but not found in result"
         );
     }
-    for elem in &result {
+    for elem in aba.backward_sets(result).unwrap() {
         assert!(
-            expected.contains(elem),
+            expected.contains(&elem),
             "{elem:?} was found in the result, but is not expected!"
         );
     }
@@ -164,13 +189,15 @@ fn a_chain_with_no_beginning() {
 #[test]
 #[ignore]
 fn loops_and_conflicts() {
-    let aba = Aba::default()
+    let aba = DebugAba::default()
         .with_assumption('a', 'b')
         .with_rule('b', ['a'])
         .with_rule('b', ['c'])
         .with_rule('c', ['b'])
         .with_rule('d', ['b']);
+    let element = aba.forward_atom('d').unwrap();
     let result =
-        crate::aba::problems::solve(DecideCredulousComplete { element: 'd' }, aba).unwrap();
+        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone())
+            .unwrap();
     assert!(!result, "d cannot be credulous complete");
 }

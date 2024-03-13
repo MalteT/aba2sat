@@ -4,12 +4,12 @@
 //!
 //! ## Example
 //! ```
-//! # use aba2sat::aba::Aba;
+//! # use aba2sat::aba::debug::DebugAba;
 //! # use aba2sat::aba::problems::solve;
 //! # use aba2sat::aba::problems::admissibility::VerifyAdmissibleExtension;
 //! let aba =
 //!     // Start with an empty framework
-//!     Aba::default()
+//!     DebugAba::default()
 //!         // Add an assumption 'a' with inverse 'p'
 //!         .with_assumption('a', 'p')
 //!         // Add an assumption 'b' with inverse 'q'
@@ -35,38 +35,44 @@ use crate::{
     literal::{IntoLiteral, Literal, TheoryAtom},
 };
 
+pub mod debug;
 pub mod problems;
 
-pub type Rule<A> = (A, HashSet<A>);
-pub type RuleList<A> = Vec<Rule<A>>;
-
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct Aba<A: Atom> {
-    pub rules: RuleList<A>,
-    pub inverses: HashMap<A, A>,
-}
-
 #[derive(Debug)]
-pub struct Theory<A: Atom>(A);
+pub struct Theory(Num);
 
-impl<A: Atom> From<A> for Theory<A> {
-    fn from(value: A) -> Self {
+impl From<Num> for Theory {
+    fn from(value: Num) -> Self {
         Self(value)
     }
 }
 
-impl<A: Atom> Aba<A> {
-    pub fn with_assumption(mut self, assumption: A, inverse: A) -> Self {
+pub type Rule<A> = (A, HashSet<A>);
+pub type RuleList<A> = Vec<Rule<A>>;
+pub type Num = u32;
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Aba {
+    rules: RuleList<Num>,
+    inverses: HashMap<Num, Num>,
+}
+
+impl Aba {
+    pub fn with_assumption(mut self, assumption: Num, inverse: Num) -> Self {
         self.inverses.insert(assumption, inverse);
         self
     }
 
-    pub fn with_rule<B: IntoIterator<Item = A>>(mut self, head: A, body: B) -> Self {
-        self.rules.push((head, body.into_iter().collect()));
+    pub fn with_rule<B: IntoIterator<Item = Num>>(mut self, head: Num, body: B) -> Self {
+        let mut body_trans = HashSet::new();
+        body.into_iter().for_each(|elem| {
+            body_trans.insert(elem);
+        });
+        self.rules.push((head, body_trans));
         self
     }
 
-    pub fn universe(&self) -> impl Iterator<Item = &A> {
+    pub fn universe(&self) -> impl Iterator<Item = &Num> {
         // List of all elements of our ABA, basically our L (universe)
         self.inverses
             .keys()
@@ -75,11 +81,11 @@ impl<A: Atom> Aba<A> {
             .chain(self.rules.iter().map(|(head, _)| head))
     }
 
-    pub fn assumptions(&self) -> impl Iterator<Item = &A> {
+    pub fn assumptions(&self) -> impl Iterator<Item = &Num> {
         self.inverses.keys()
     }
 
-    pub fn contains_assumption(&self, a: &A) -> bool {
+    pub fn contains_assumption(&self, a: &Num) -> bool {
         self.inverses.contains_key(a)
     }
 
@@ -120,7 +126,7 @@ impl<A: Atom> Aba<A> {
                 }
                 if body.iter().all(|atom| reachable.contains(atom)) {
                     marked_any = true;
-                    reachable.insert(head.clone());
+                    reachable.insert(*head);
                 }
             }
             if !marked_any {
@@ -135,29 +141,21 @@ impl<A: Atom> Aba<A> {
     }
 
     fn derive_rule_clauses(&self) -> impl Iterator<Item = Clause> + '_ {
-        theory_helper::<Theory<_>, _>(self)
+        theory_helper::<Theory>(self)
     }
 
-    fn rule_heads(&self) -> impl Iterator<Item = &A> + '_ {
+    fn rule_heads(&self) -> impl Iterator<Item = &Num> + '_ {
         self.rules.iter().map(|(head, _)| head)
-    }
-
-    fn has_assumption(&self, atom: &A) -> bool {
-        self.inverses.contains_key(atom)
-    }
-
-    fn has_element(&self, element: &A) -> bool {
-        self.universe().any(|e| element == e)
     }
 }
 
-fn body_to_clauses<I: TheoryAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) -> ClauseList {
+fn body_to_clauses<I: TheoryAtom>(head: Literal, body: &HashSet<Num>) -> ClauseList {
     let mut clauses = vec![];
-    let mut left_implication: Clause = body.iter().map(|elem| I::new(elem.clone()).neg()).collect();
+    let mut left_implication: Clause = body.iter().map(|elem| I::new(*elem).neg()).collect();
     left_implication.push(head.clone().positive());
     clauses.push(left_implication);
     body.iter()
-        .map(|elem| vec![head.clone().negative(), I::new(elem.clone()).pos()].into())
+        .map(|elem| vec![head.clone().negative(), I::new(*elem).pos()].into())
         .collect_into(&mut clauses);
     clauses
 }
@@ -187,7 +185,7 @@ fn body_to_clauses<I: TheoryAtom<A>, A: Atom>(head: Literal, body: &HashSet<A>) 
 ///   A lot of the overhead is due to the fact that multiple bodies are an option, if that's
 ///   not given for a head `p` we use the simplified translation logic where `p` is true iff
 ///   `bodies(p)` is true.
-pub fn theory_helper<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> impl Iterator<Item = Clause> + '_ {
+pub fn theory_helper<I: TheoryAtom>(aba: &Aba) -> impl Iterator<Item = Clause> + '_ {
     // The combined list of rules, such that every
     // head is unique and possible contains a list of bodies
     let mut rules_combined =
@@ -203,7 +201,7 @@ pub fn theory_helper<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> impl Iterator<I
     // such that it cannot be derived at all. This is to prevent the solver from
     // guessing this atom on it's own
     aba.universe()
-        .filter(|atom| !aba.has_assumption(atom))
+        .filter(|atom| !aba.contains_assumption(atom))
         .filter(|atom| !rule_heads.contains(atom))
         .map(|atom| (atom, vec![]))
         .collect_into(&mut rules_combined);
@@ -214,10 +212,10 @@ pub fn theory_helper<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> impl Iterator<I
         .flat_map(|(head, bodies)| match &bodies[..] {
             // No bodies, add a clause that prevents the head from accuring in the theory
             [] => {
-                vec![Clause::from(vec![I::new(head.clone()).neg()])]
+                vec![Clause::from(vec![I::new(*head).neg()])]
             }
             // A single body only, this is equivalent to a head that can only be derived by a single rule
-            [body] => body_to_clauses::<I, _>(I::new(head.clone()).pos(), body),
+            [body] => body_to_clauses::<I>(I::new(*head).pos(), body),
             // n bodies, we'll need to take extra care to allow any number of bodies to derive this
             // head without logic errors
             bodies => {
@@ -226,21 +224,18 @@ pub fn theory_helper<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> impl Iterator<I
                     .iter()
                     .enumerate()
                     .flat_map(|(idx, body)| {
-                        body_to_clauses::<I, _>(
-                            TheoryHelper::<I, _>::new(idx, head.clone()).pos(),
-                            body,
-                        )
+                        body_to_clauses::<I>(TheoryHelper::<I, _>::new(idx, *head).pos(), body)
                     })
                     .collect_into(&mut clauses);
                 let helpers: Vec<_> = (0..bodies.len())
-                    .map(|idx| TheoryHelper::<I, _>::new(idx, head.clone()).pos())
+                    .map(|idx| TheoryHelper::<I, _>::new(idx, *head).pos())
                     .collect();
                 let mut right_implification: Clause = helpers.iter().cloned().collect();
-                right_implification.push(I::new(head.clone()).neg());
+                right_implification.push(I::new(*head).neg());
                 clauses.push(right_implification);
                 helpers
                     .into_iter()
-                    .map(|helper| Clause::from(vec![I::new(head.clone()).pos(), helper.negative()]))
+                    .map(|helper| Clause::from(vec![I::new(*head).pos(), helper.negative()]))
                     .collect_into(&mut clauses);
                 clauses
             }
@@ -248,13 +243,13 @@ pub fn theory_helper<I: TheoryAtom<A>, A: Atom>(aba: &Aba<A>) -> impl Iterator<I
 }
 
 #[derive(Debug)]
-struct TheoryHelper<T: TheoryAtom<A>, A: Atom> {
+struct TheoryHelper<T: TheoryAtom, A: Atom> {
     _idx: usize,
     _atom: A,
     inner: PhantomData<T>,
 }
 
-impl<T: TheoryAtom<A>, A: Atom> TheoryHelper<T, A> {
+impl<T: TheoryAtom, A: Atom> TheoryHelper<T, A> {
     fn new(idx: usize, atom: A) -> Self {
         Self {
             _idx: idx,

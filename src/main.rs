@@ -4,12 +4,15 @@
 
 use std::{collections::HashSet, fmt::Write as WriteFmt, fs::read_to_string, io::Write as WriteIo};
 
-use aba::problems::{
-    admissibility::{
-        DecideCredulousAdmissibility, EnumerateAdmissibleExtensions, SampleAdmissibleExtension,
-        VerifyAdmissibleExtension,
+use aba::{
+    problems::{
+        admissibility::{
+            DecideCredulousAdmissibility, EnumerateAdmissibleExtensions, SampleAdmissibleExtension,
+            VerifyAdmissibleExtension,
+        },
+        complete::{DecideCredulousComplete, EnumerateCompleteExtensions},
     },
-    complete::{DecideCredulousComplete, EnumerateCompleteExtensions},
+    Num,
 };
 use clap::Parser;
 
@@ -19,13 +22,6 @@ use crate::error::{Error, Result};
 macro_rules! set {
     ($($elem:expr),*) => {{
         vec![$($elem),*].into_iter().collect()
-    }}
-}
-
-#[cfg(test)]
-macro_rules! map {
-    ($($from:expr => $to:expr),*) => {{
-        vec![$(($from, $to)),*].into_iter().collect()
     }}
 }
 
@@ -88,7 +84,7 @@ fn main() -> Result {
     __main().inspect_err(|why| eprintln!("Error: {why}"))
 }
 
-impl IccmaFormattable for Vec<HashSet<u32>> {
+impl IccmaFormattable for Vec<HashSet<Num>> {
     fn fmt_iccma(&self) -> Result<String> {
         let output = self
             .iter()
@@ -102,7 +98,7 @@ impl IccmaFormattable for Vec<HashSet<u32>> {
     }
 }
 
-impl IccmaFormattable for HashSet<u32> {
+impl IccmaFormattable for HashSet<Num> {
     fn fmt_iccma(&self) -> Result<String> {
         let set = self
             .iter()

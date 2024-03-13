@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{Aba, Theory},
-    clauses::{Atom, Clause, ClauseList},
+    aba::{Aba, Num, Theory},
+    clauses::{Clause, ClauseList},
     error::Error,
     literal::{IntoLiteral, TheoryAtom},
     Result,
@@ -14,34 +14,34 @@ use super::{
 };
 
 #[derive(Debug, Default)]
-pub struct EnumerateCompleteExtensions<A> {
-    found: Vec<HashSet<A>>,
+pub struct EnumerateCompleteExtensions {
+    found: Vec<HashSet<Num>>,
 }
 
 /// Decide whether `assumption` is credulously complete in an [`Aba`]
-pub struct DecideCredulousComplete<A> {
-    pub element: A,
+pub struct DecideCredulousComplete {
+    pub element: Num,
 }
 
-fn initial_complete_clauses<A: Atom>(aba: &Aba<A>) -> ClauseList {
+fn initial_complete_clauses(aba: &Aba) -> ClauseList {
     // Take everything from admissibility
-    let mut clauses = initial_admissibility_clauses::<SetTheory<_>, _>(aba);
+    let mut clauses = initial_admissibility_clauses::<SetTheory>(aba);
     // Additional complete logic
     for (assumption, inverse) in &aba.inverses {
         // For any assumption `a` and it's inverse `b`:
         //   b not in th(A) => a in th(S)
         clauses.push(Clause::from(vec![
-            Theory(inverse.clone()).pos(),
-            SetTheory(assumption.clone()).pos(),
+            Theory(*inverse).pos(),
+            SetTheory(*assumption).pos(),
         ]));
     }
     clauses
 }
 
-impl<A: Atom> MultishotProblem<A> for EnumerateCompleteExtensions<A> {
-    type Output = Vec<HashSet<A>>;
+impl MultishotProblem<Num> for EnumerateCompleteExtensions {
+    type Output = Vec<HashSet<Num>>;
 
-    fn additional_clauses(&self, aba: &Aba<A>, iteration: usize) -> ClauseList {
+    fn additional_clauses(&self, aba: &Aba, iteration: usize) -> ClauseList {
         match iteration {
             0 => initial_complete_clauses(aba),
             idx => {
@@ -50,13 +50,12 @@ impl<A: Atom> MultishotProblem<A> for EnumerateCompleteExtensions<A> {
                 //   {-a, b, -c, -d, e, f} must be true
                 let just_found = &self.found[idx - 1];
                 let new_clause = aba
-                    .inverses
-                    .keys()
+                    .assumptions()
                     .map(|assumption| {
                         if just_found.contains(assumption) {
-                            SetTheory::new(assumption.clone()).neg()
+                            SetTheory::new(*assumption).neg()
                         } else {
-                            SetTheory::new(assumption.clone()).pos()
+                            SetTheory::new(*assumption).pos()
                         }
                     })
                     .collect();
@@ -65,7 +64,7 @@ impl<A: Atom> MultishotProblem<A> for EnumerateCompleteExtensions<A> {
         }
     }
 
-    fn feedback(&mut self, state: SolverState<'_, A>) -> LoopControl {
+    fn feedback(&mut self, state: SolverState<'_>) -> LoopControl {
         if !state.sat_result {
             return LoopControl::Stop;
         }
@@ -75,10 +74,10 @@ impl<A: Atom> MultishotProblem<A> for EnumerateCompleteExtensions<A> {
             .inverses
             .keys()
             .filter_map(|assumption| {
-                let literal = SetTheory::new(assumption.clone()).pos();
+                let literal = SetTheory::new(*assumption).pos();
                 let raw = state.map.get_raw(&literal)?;
                 match state.solver.value(raw) {
-                    Some(true) => Some(assumption.clone()),
+                    Some(true) => Some(*assumption),
                     _ => None,
                 }
             })
@@ -87,30 +86,26 @@ impl<A: Atom> MultishotProblem<A> for EnumerateCompleteExtensions<A> {
         LoopControl::Continue
     }
 
-    fn construct_output(
-        self,
-        _state: SolverState<'_, A>,
-        _total_iterations: usize,
-    ) -> Self::Output {
+    fn construct_output(self, _state: SolverState<'_>, _total_iterations: usize) -> Self::Output {
         self.found
     }
 }
 
-impl<A: Atom> Problem<A> for DecideCredulousComplete<A> {
+impl Problem for DecideCredulousComplete {
     type Output = bool;
 
-    fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
+    fn additional_clauses(&self, aba: &Aba) -> ClauseList {
         let mut clauses = initial_complete_clauses(aba);
-        clauses.push(Clause::from(vec![SetTheory(self.element.clone()).pos()]));
+        clauses.push(Clause::from(vec![SetTheory(self.element).pos()]));
         clauses
     }
 
-    fn construct_output(self, state: SolverState<'_, A>) -> Self::Output {
+    fn construct_output(self, state: SolverState<'_>) -> Self::Output {
         state.sat_result
     }
 
-    fn check(&self, aba: &Aba<A>) -> Result {
-        if aba.has_element(&self.element) {
+    fn check(&self, aba: &Aba) -> Result {
+        if aba.contains_assumption(&self.element) {
             Ok(())
         } else {
             Err(Error::ProblemCheckFailed(format!(

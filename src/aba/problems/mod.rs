@@ -6,7 +6,7 @@ use crate::{
     mapper::Mapper,
 };
 
-use super::Aba;
+use super::{Aba, Num};
 
 pub mod admissibility;
 pub mod complete;
@@ -18,20 +18,20 @@ pub enum LoopControl {
     Stop,
 }
 
-pub struct SolverState<'a, A: Atom + 'a> {
-    aba: &'a Aba<A>,
+pub struct SolverState<'a> {
+    aba: &'a Aba,
     sat_result: bool,
     solver: &'a Solver,
     map: &'a Mapper,
 }
 
 #[doc(notable_trait)]
-pub trait Problem<A: Atom> {
+pub trait Problem {
     type Output;
-    fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList;
-    fn construct_output(self, state: SolverState<'_, A>) -> Self::Output;
+    fn additional_clauses(&self, aba: &Aba) -> ClauseList;
+    fn construct_output(self, state: SolverState<'_>) -> Self::Output;
 
-    fn check(&self, _aba: &Aba<A>) -> Result {
+    fn check(&self, _aba: &Aba) -> Result {
         Ok(())
     }
 }
@@ -39,26 +39,26 @@ pub trait Problem<A: Atom> {
 #[doc(notable_trait)]
 pub trait MultishotProblem<A: Atom> {
     type Output;
-    fn additional_clauses(&self, aba: &Aba<A>, iteration: usize) -> ClauseList;
-    fn feedback(&mut self, state: SolverState<'_, A>) -> LoopControl;
-    fn construct_output(self, state: SolverState<'_, A>, total_iterations: usize) -> Self::Output;
+    fn additional_clauses(&self, aba: &Aba, iteration: usize) -> ClauseList;
+    fn feedback(&mut self, state: SolverState<'_>) -> LoopControl;
+    fn construct_output(self, state: SolverState<'_>, total_iterations: usize) -> Self::Output;
 
-    fn check(&self, _aba: &Aba<A>) -> Result {
+    fn check(&self, _aba: &Aba) -> Result {
         Ok(())
     }
 }
 
 /// *(Literal)* `A` is element of `th(S)`
 #[derive(Debug)]
-pub struct SetTheory<A: Atom>(A);
+pub struct SetTheory(Num);
 
-impl<A: Atom> From<A> for SetTheory<A> {
-    fn from(value: A) -> Self {
+impl From<Num> for SetTheory {
+    fn from(value: Num) -> Self {
         Self(value)
     }
 }
 
-pub fn solve<A: Atom, P: Problem<A>>(problem: P, mut aba: Aba<A>) -> Result<P::Output> {
+pub fn solve<P: Problem>(problem: P, mut aba: Aba) -> Result<P::Output> {
     // Trim the ABA, this is always safe
     aba.trim();
     // Let the problem perform additional checks before starting the solver
@@ -101,7 +101,7 @@ pub fn solve<A: Atom, P: Problem<A>>(problem: P, mut aba: Aba<A>) -> Result<P::O
 
 pub fn multishot_solve<A: Atom, P: MultishotProblem<A>>(
     mut problem: P,
-    mut aba: Aba<A>,
+    mut aba: Aba,
 ) -> Result<P::Output> {
     // Trim the ABA, this is always safe
     aba.trim();

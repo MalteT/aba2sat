@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{Aba, Theory},
-    clauses::{Atom, Clause, ClauseList},
+    aba::{Aba, Num, Theory},
+    clauses::{Clause, ClauseList},
     error::Error,
     literal::{IntoLiteral, TheoryAtom},
     Result,
@@ -10,18 +10,18 @@ use crate::{
 
 use super::{Problem, SolverState};
 
-pub struct ConflictFreeness<A: Atom> {
-    pub assumptions: HashSet<A>,
+pub struct ConflictFreeness {
+    pub assumptions: HashSet<Num>,
 }
 
-impl<A: Atom> Problem<A> for ConflictFreeness<A> {
+impl Problem for ConflictFreeness {
     type Output = bool;
 
-    fn additional_clauses(&self, aba: &Aba<A>) -> ClauseList {
+    fn additional_clauses(&self, aba: &Aba) -> ClauseList {
         let mut clauses = vec![];
         // Make sure that every assumption in our problem is inferred and every other not
         for assumption in aba.assumptions() {
-            let theory = Theory::new(assumption.clone());
+            let theory = Theory::new(*assumption);
             if self.assumptions.contains(assumption) {
                 clauses.push(vec![theory.pos()].into())
             } else {
@@ -30,23 +30,23 @@ impl<A: Atom> Problem<A> for ConflictFreeness<A> {
         }
         for (assumption, inverse) in &aba.inverses {
             clauses.push(Clause::from(vec![
-                Theory::new(assumption.clone()).neg(),
-                Theory::new(inverse.clone()).neg(),
+                Theory::new(*assumption).neg(),
+                Theory::new(*inverse).neg(),
             ]));
         }
         clauses
     }
 
-    fn construct_output(self, state: SolverState<'_, A>) -> Self::Output {
+    fn construct_output(self, state: SolverState<'_>) -> Self::Output {
         state.sat_result
     }
 
-    fn check(&self, aba: &Aba<A>) -> Result {
+    fn check(&self, aba: &Aba) -> Result {
         // Make sure that every assumption is part of the ABA
         match self
             .assumptions
             .iter()
-            .find(|a| !aba.contains_assumption(a))
+            .find(|assumption| !aba.contains_assumption(assumption))
         {
             Some(assumption) => Err(Error::ProblemCheckFailed(format!(
                 "Assumption {:?} not present in ABA framework",

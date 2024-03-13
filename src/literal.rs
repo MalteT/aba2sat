@@ -3,7 +3,7 @@ use std::{
     fmt::Debug,
 };
 
-use crate::clauses::Atom;
+use crate::aba::Num;
 
 /// A Literal can be used in SAT [`Clause`](crate::clauses::Clause)s
 #[derive(Clone)]
@@ -42,11 +42,12 @@ impl<T: Any + Debug + Sized> IntoLiteral for T {
 /// the theory of a (sub-)set of assumptions (`th(S)`) in an [`Aba`](crate::aba::Aba).
 ///
 /// See [`crate::aba::theory_helper`].
-pub trait TheoryAtom<A: Atom>: Sized + IntoLiteral + std::fmt::Debug + 'static {
-    fn new(atom: A) -> Self;
+pub trait TheoryAtom: Sized + IntoLiteral + std::fmt::Debug + 'static {
+    fn new(atom: Num) -> Self;
 }
-impl<A: Atom, T: From<A> + Sized + IntoLiteral + std::fmt::Debug + 'static> TheoryAtom<A> for T {
-    fn new(atom: A) -> Self {
+
+impl<T: From<Num> + Sized + IntoLiteral + std::fmt::Debug + 'static> TheoryAtom for T {
+    fn new(atom: Num) -> Self {
         Self::from(atom)
     }
 }

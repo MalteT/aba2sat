@@ -35,10 +35,10 @@ use nom::multi::fold_many0;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::IResult;
 
-use crate::aba::Aba;
+use crate::aba::{Aba, Num};
 use crate::error::Result;
 
-pub fn aba_file(input: &str) -> Result<Aba<u32>> {
+pub fn aba_file(input: &str) -> Result<Aba> {
     let (input, number_of_atoms) = p_line(input)?;
     let (_, aba) = all_consuming(aba)(input)?;
     #[cfg(debug_assertions)]
@@ -68,12 +68,12 @@ fn p_line(input: &str) -> IResult<&str, u32> {
 #[derive(Debug, PartialEq)]
 enum AbaLine {
     Comment,
-    Assumption(u32),
-    Inverse(u32, u32),
-    Rule(u32, HashSet<u32>),
+    Assumption(Num),
+    Inverse(Num, Num),
+    Rule(Num, HashSet<Num>),
 }
 
-fn aba(input: &str) -> IResult<&str, Aba<u32>> {
+fn aba(input: &str) -> IResult<&str, Aba> {
     let parse_aba_line = terminated(alt((assumption, comment, inverse, rule)), eol_or_eoi);
     let collect_aba = fold_many0(
         parse_aba_line,
@@ -133,15 +133,15 @@ fn eol_or_eoi(input: &str) -> IResult<&str, &str> {
     alt((newline, eof))(input)
 }
 
-fn atom(input: &str) -> IResult<&str, u32> {
-    verify(complete::u32, |&num| num != 0)(input)
+fn atom(input: &str) -> IResult<&str, Num> {
+    map(verify(complete::u32, |&num| num != 0), |atom| atom as Num)(input)
 }
 
 #[cfg(test)]
 mod tests {
     use nom::combinator::all_consuming;
 
-    use crate::aba::Aba;
+    use crate::aba::{Aba, Num};
 
     fn assert_parse<F, T>(parser: F, input: &str, expected: T)
     where
@@ -149,7 +149,7 @@ mod tests {
         T: std::fmt::Debug + PartialEq,
     {
         let (_rest, result) =
-            all_consuming(parser)(input).expect(&format!("Failed to parse {input:?}"));
+            all_consuming(parser)(input).unwrap_or_else(|_| panic!("Failed to parse {input:?}"));
         assert_eq!(result, expected);
     }
 
@@ -198,7 +198,7 @@ mod tests {
     fn assumption() {
         use super::AbaLine::Assumption;
         assert_parse(super::assumption, "a 1", Assumption(1));
-        assert_parse(super::assumption, "a 4294967295", Assumption(u32::MAX));
+        assert_parse(super::assumption, "a 4294967295", Assumption(Num::MAX));
         assert_parse(super::assumption, "a\t1", Assumption(1));
         assert_parse(super::assumption, "a\t 1", Assumption(1));
         assert_parse(super::assumption, "a\t 1 ", Assumption(1));
@@ -243,10 +243,7 @@ mod tests {
             r#"a 2
 c 2 1
 r 1 2 3"#,
-            Aba {
-                rules: vec![(1, set!(2, 3))],
-                inverses: map![2 => 1],
-            },
+            Aba::default().with_assumption(2, 1).with_rule(1, [2, 3]),
         )
     }
 
@@ -262,10 +259,7 @@ r 1 2 3
         .unwrap();
         assert_eq!(
             res,
-            Aba {
-                rules: vec![(1, set!(2, 3))],
-                inverses: map![2 => 1],
-            }
+            Aba::default().with_assumption(2, 1).with_rule(1, [2, 3])
         )
     }
 }
