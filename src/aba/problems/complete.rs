@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{Aba, Num, Theory},
+    aba::{prepared::PreparedAba, Aba, Num, Theory},
     clauses::{Clause, ClauseList},
     error::Error,
     literal::{IntoLiteral, TheoryAtom},
@@ -23,7 +23,7 @@ pub struct DecideCredulousComplete {
     pub element: Num,
 }
 
-fn initial_complete_clauses(aba: &Aba) -> ClauseList {
+fn initial_complete_clauses(aba: &PreparedAba) -> ClauseList {
     // Take everything from admissibility
     let mut clauses = initial_admissibility_clauses::<SetTheory>(aba);
     // Additional complete logic
@@ -38,10 +38,10 @@ fn initial_complete_clauses(aba: &Aba) -> ClauseList {
     clauses
 }
 
-impl MultishotProblem<Num> for EnumerateCompleteExtensions {
+impl MultishotProblem for EnumerateCompleteExtensions {
     type Output = Vec<HashSet<Num>>;
 
-    fn additional_clauses(&self, aba: &Aba, iteration: usize) -> ClauseList {
+    fn additional_clauses(&self, aba: &PreparedAba, iteration: usize) -> ClauseList {
         match iteration {
             0 => initial_complete_clauses(aba),
             idx => {
@@ -94,7 +94,7 @@ impl MultishotProblem<Num> for EnumerateCompleteExtensions {
 impl Problem for DecideCredulousComplete {
     type Output = bool;
 
-    fn additional_clauses(&self, aba: &Aba) -> ClauseList {
+    fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
         let mut clauses = initial_complete_clauses(aba);
         clauses.push(Clause::from(vec![SetTheory(self.element).pos()]));
         clauses
@@ -105,7 +105,7 @@ impl Problem for DecideCredulousComplete {
     }
 
     fn check(&self, aba: &Aba) -> Result {
-        if aba.contains_assumption(&self.element) {
+        if aba.contains_atom(&self.element) {
             Ok(())
         } else {
             Err(Error::ProblemCheckFailed(format!(

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{Aba, Num, Theory},
+    aba::{prepared::PreparedAba, Aba, Num, Theory},
     clauses::{Clause, ClauseList},
     error::Error,
     literal::{IntoLiteral, TheoryAtom},
@@ -17,7 +17,7 @@ pub struct ConflictFreeness {
 impl Problem for ConflictFreeness {
     type Output = bool;
 
-    fn additional_clauses(&self, aba: &Aba) -> ClauseList {
+    fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
         let mut clauses = vec![];
         // Make sure that every assumption in our problem is inferred and every other not
         for assumption in aba.assumptions() {

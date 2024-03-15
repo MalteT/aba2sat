@@ -21,80 +21,112 @@
 //! LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //! SOFTWARE.
-#![allow(dead_code)]
 
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+use crate::aba::Num;
+
+#[derive(Debug)]
 pub struct Graph {
-    n: usize,
-    adj_list: Vec<Vec<usize>>,
+    adj_list: BTreeMap<Num, Vec<Num>>,
 }
 
 impl Graph {
-    pub fn new(n: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            n,
-            adj_list: vec![vec![]; n],
+            adj_list: BTreeMap::new(),
         }
     }
 
-    pub fn add_edge(&mut self, u: usize, v: usize) {
-        self.adj_list[u].push(v);
-    }
-}
-pub fn tarjan_scc(graph: &Graph) -> Vec<Vec<usize>> {
-    struct TarjanState {
-        index: i32,
-        stack: Vec<usize>,
-        on_stack: Vec<bool>,
-        index_of: Vec<i32>,
-        lowlink_of: Vec<i32>,
-        components: Vec<Vec<usize>>,
+    #[cfg(test)]
+    pub fn add_vertex(&mut self, vertex: Num) {
+        self.adj_list.entry(vertex).or_default();
     }
 
-    let mut state = TarjanState {
-        index: 0,
-        stack: Vec::new(),
-        on_stack: vec![false; graph.n],
-        index_of: vec![-1; graph.n],
-        lowlink_of: vec![-1; graph.n],
-        components: Vec::new(),
-    };
+    pub fn add_edge(&mut self, from: Num, to: Num) {
+        self.adj_list.entry(from).or_default().push(to);
+    }
 
-    fn strong_connect(v: usize, graph: &Graph, state: &mut TarjanState) {
-        state.index_of[v] = state.index;
-        state.lowlink_of[v] = state.index;
-        state.index += 1;
-        state.stack.push(v);
-        state.on_stack[v] = true;
-
-        for &w in &graph.adj_list[v] {
-            if state.index_of[w] == -1 {
-                strong_connect(w, graph, state);
-                state.lowlink_of[v] = state.lowlink_of[v].min(state.lowlink_of[w]);
-            } else if state.on_stack[w] {
-                state.lowlink_of[v] = state.lowlink_of[v].min(state.index_of[w]);
-            }
+    pub fn tarjan_scc(&self) -> Vec<HashSet<Num>> {
+        struct TarjanState {
+            index: i32,
+            stack: Vec<Num>,
+            on_stack: BTreeSet<Num>,
+            index_of: BTreeMap<Num, i32>,
+            lowlink_of: BTreeMap<Num, i32>,
+            components: Vec<HashSet<Num>>,
         }
 
-        if state.lowlink_of[v] == state.index_of[v] {
-            let mut component: Vec<usize> = Vec::new();
-            while let Some(w) = state.stack.pop() {
-                state.on_stack[w] = false;
-                component.push(w);
-                if w == v {
-                    break;
+        let mut state = TarjanState {
+            index: 0,
+            stack: Vec::new(),
+            on_stack: Default::default(),
+            index_of: Default::default(),
+            lowlink_of: Default::default(),
+            components: Vec::new(),
+        };
+
+        fn strong_connect(v: Num, graph: &Graph, state: &mut TarjanState) {
+            state.index_of.insert(v, state.index);
+            state.lowlink_of.insert(v, state.index);
+            state.index += 1;
+            state.stack.push(v);
+            state.on_stack.insert(v);
+
+            for &w in graph.adj_list.get(&v).unwrap_or(&vec![]) {
+                if !state.index_of.contains_key(&w) {
+                    strong_connect(w, graph, state);
+                    let curr = state.lowlink_of.get(&v).cloned();
+                    let other = state.lowlink_of.get(&w).cloned();
+                    match (curr, other) {
+                        (Some(curr), Some(other)) => {
+                            state.lowlink_of.insert(v, curr.min(other));
+                        }
+                        (Some(first), None) | (None, Some(first)) => {
+                            state.lowlink_of.insert(v, first);
+                        }
+                        (None, None) => {
+                            state.lowlink_of.remove(&v);
+                        }
+                    }
+                } else if state.on_stack.contains(&w) {
+                    let curr = state.lowlink_of.get(&v).cloned();
+                    let other = state.index_of.get(&w).cloned();
+                    match (curr, other) {
+                        (Some(curr), Some(other)) => {
+                            state.lowlink_of.insert(v, curr.min(other));
+                        }
+                        (Some(first), None) | (None, Some(first)) => {
+                            state.lowlink_of.insert(v, first);
+                        }
+                        (None, None) => {
+                            state.lowlink_of.remove(&v);
+                        }
+                    }
                 }
             }
-            state.components.push(component);
-        }
-    }
 
-    for v in 0..graph.n {
-        if state.index_of[v] == -1 {
-            strong_connect(v, graph, &mut state);
+            if state.lowlink_of.get(&v) == state.index_of.get(&v) {
+                let mut component = HashSet::new();
+                while let Some(w) = state.stack.pop() {
+                    state.on_stack.remove(&w);
+                    component.insert(w);
+                    if w == v {
+                        break;
+                    }
+                }
+                state.components.push(component);
+            }
         }
-    }
 
-    state.components
+        for v in self.adj_list.keys() {
+            if !state.index_of.contains_key(v) {
+                strong_connect(*v, self, &mut state);
+            }
+        }
+
+        state.components
+    }
 }
 
 #[cfg(test)]
@@ -124,52 +156,55 @@ mod tests {
             (8, 9),
             (9, 8),
         ];
-        let mut graph = Graph::new(n_vertices);
+        let mut graph = Graph::new();
+        (0..n_vertices).for_each(|v| graph.add_vertex(v));
 
         for &(u, v) in &edges {
             graph.add_edge(u, v);
         }
 
-        let components = tarjan_scc(&graph);
+        let components = graph.tarjan_scc();
         assert_eq!(
             components,
             vec![
-                vec![8, 9],
-                vec![7],
-                vec![5, 4, 6],
-                vec![3, 2, 1, 0],
-                vec![10],
+                set![8, 9],
+                set![7],
+                set![5, 4, 6],
+                set![3, 2, 1, 0],
+                set![10],
             ]
         );
 
         // Test 2: A graph with no edges
         let n_vertices = 5;
-        let edges: Vec<(usize, usize)> = vec![];
-        let mut graph = Graph::new(n_vertices);
+        let edges = vec![];
+        let mut graph = Graph::new();
+        (0..n_vertices).for_each(|v| graph.add_vertex(v));
 
         for &(u, v) in &edges {
             graph.add_edge(u, v);
         }
 
-        let components = tarjan_scc(&graph);
+        let components = graph.tarjan_scc();
 
         // Each node is its own SCC
         assert_eq!(
             components,
-            vec![vec![0], vec![1], vec![2], vec![3], vec![4]]
+            vec![set![0], set![1], set![2], set![3], set![4]]
         );
 
         // Test 3: A graph with single strongly connected component
         let n_vertices = 5;
         let edges = vec![(0, 1), (1, 2), (2, 3), (2, 4), (3, 0), (4, 2)];
-        let mut graph = Graph::new(n_vertices);
+        let mut graph = Graph::new();
+        (0..n_vertices).for_each(|v| graph.add_vertex(v));
 
         for &(u, v) in &edges {
             graph.add_edge(u, v);
         }
 
-        let components = tarjan_scc(&graph);
-        assert_eq!(components, vec![vec![4, 3, 2, 1, 0]]);
+        let components = graph.tarjan_scc();
+        assert_eq!(components, vec![set![4, 3, 2, 1, 0]]);
 
         // Test 4: A graph with multiple strongly connected component
         let n_vertices = 7;
@@ -183,16 +218,17 @@ mod tests {
             (3, 5),
             (4, 5),
         ];
-        let mut graph = Graph::new(n_vertices);
+        let mut graph = Graph::new();
+        (0..n_vertices).for_each(|v| graph.add_vertex(v));
 
         for &(u, v) in &edges {
             graph.add_edge(u, v);
         }
 
-        let components = tarjan_scc(&graph);
+        let components = graph.tarjan_scc();
         assert_eq!(
             components,
-            vec![vec![5], vec![3], vec![4], vec![6], vec![2, 1, 0],]
+            vec![set![5], set![3], set![4], set![6], set![2, 1, 0],]
         );
     }
 }

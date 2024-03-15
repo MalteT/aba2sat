@@ -187,7 +187,6 @@ fn a_chain_with_no_beginning() {
 }
 
 #[test]
-#[ignore]
 fn loops_and_conflicts() {
     let aba = DebugAba::default()
         .with_assumption('a', 'b')
@@ -200,4 +199,19 @@ fn loops_and_conflicts() {
         crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone())
             .unwrap();
     assert!(!result, "d cannot be credulous complete");
+}
+
+#[test]
+fn loops_and_conflicts_2() {
+    let aba = DebugAba::default()
+        .with_assumption('a', 'e')
+        .with_assumption('b', 'f')
+        .with_rule('c', ['d'])
+        .with_rule('d', ['c'])
+        .with_rule('d', ['a']);
+    let element = aba.forward_atom('b').unwrap();
+    let result =
+        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone())
+            .unwrap();
+    assert!(result, "b is credulous complete");
 }

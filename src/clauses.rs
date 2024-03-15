@@ -1,20 +1,10 @@
-use std::{
-    fmt::{Debug, Display},
-    hash::Hash,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 use crate::literal::Literal;
 
 pub type ClauseList = Vec<Clause>;
 pub type RawClause = Vec<RawLiteral>;
 pub type RawLiteral = i32;
-
-/// Generic Atom that can be used to construct [`Clause`]s.
-#[doc(notable_trait)]
-pub trait Atom: Debug + Display + Hash + Eq + Clone + 'static {}
-
-impl<A: Debug + Display + Hash + Eq + Clone + 'static> Atom for A {}
 
 /// A disjunction of [`Literal`]s.
 pub struct Clause {

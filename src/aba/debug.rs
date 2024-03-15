@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::{Aba, Num};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct DebugAba {
     aba: Aba,
     forward_map: HashMap<char, Num>,
@@ -77,6 +77,17 @@ impl DebugAba {
                 self.backward_map.insert(next, atom);
                 next
             }
+        }
+    }
+}
+
+impl Default for DebugAba {
+    fn default() -> Self {
+        Self {
+            aba: Default::default(),
+            forward_map: Default::default(),
+            backward_map: Default::default(),
+            next: 1,
         }
     }
 }

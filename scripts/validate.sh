@@ -34,12 +34,12 @@ run_dc_co() {
 	if [ "$our_result" != "$other_result" ]; then
 		printf "❌\n"
 		printf "%40s:%s\n" "arg" "$ADDITIONAL_ARG"
-		printf "%40s:%40s %s\n" "Ours" "$our_result" "$(jq /tmp/aba2sat-time --compact-output --color-output)"
-		printf "%40s:%40s %s\n" "Theirs" "$other_result" "$(jq /tmp/aspforaba-time --compact-output --color-output)"
+		printf "%40s:%40s %s\n" "Ours" "$our_result" "$(jq --compact-output --color-output </tmp/aba2sat-time)"
+		printf "%40s:%40s %s\n" "Theirs" "$other_result" "$(jq --compact-output --color-output </tmp/aspforaba-time)"
 	else
 		printf "✅\n"
-		printf "%40s:%40s %s\n" "Ours" "$our_result" "$(jq /tmp/aba2sat-time --compact-output --color-output)"
-		printf "%40s:%40s %s\n" "Theirs" "$other_result" "$(jq /tmp/aspforaba-time --compact-output --color-output)"
+		printf "%40s:%40s %s\n" "Ours" "$our_result" "$(jq --compact-output --color-output </tmp/aba2sat-time)"
+		printf "%40s:%40s %s\n" "Theirs" "$other_result" "$(jq --compact-output --color-output </tmp/aspforaba-time)"
 	fi
 }
 

@@ -1,12 +1,12 @@
 use cadical::Solver;
 
 use crate::{
-    clauses::{Atom, ClauseList},
+    clauses::ClauseList,
     error::{Error, Result},
     mapper::Mapper,
 };
 
-use super::{Aba, Num};
+use super::{prepared::PreparedAba, Aba, Num, Theory};
 
 pub mod admissibility;
 pub mod complete;
@@ -28,7 +28,7 @@ pub struct SolverState<'a> {
 #[doc(notable_trait)]
 pub trait Problem {
     type Output;
-    fn additional_clauses(&self, aba: &Aba) -> ClauseList;
+    fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList;
     fn construct_output(self, state: SolverState<'_>) -> Self::Output;
 
     fn check(&self, _aba: &Aba) -> Result {
@@ -37,9 +37,9 @@ pub trait Problem {
 }
 
 #[doc(notable_trait)]
-pub trait MultishotProblem<A: Atom> {
+pub trait MultishotProblem {
     type Output;
-    fn additional_clauses(&self, aba: &Aba, iteration: usize) -> ClauseList;
+    fn additional_clauses(&self, aba: &PreparedAba, iteration: usize) -> ClauseList;
     fn feedback(&mut self, state: SolverState<'_>) -> LoopControl;
     fn construct_output(self, state: SolverState<'_>, total_iterations: usize) -> Self::Output;
 
@@ -58,9 +58,8 @@ impl From<Num> for SetTheory {
     }
 }
 
-pub fn solve<P: Problem>(problem: P, mut aba: Aba) -> Result<P::Output> {
-    // Trim the ABA, this is always safe
-    aba.trim();
+pub fn solve<P: Problem>(problem: P, aba: Aba) -> Result<P::Output> {
+    let aba = aba.prepare();
     // Let the problem perform additional checks before starting the solver
     problem.check(&aba)?;
     // Create a map that will keep track of the translation between
@@ -69,7 +68,7 @@ pub fn solve<P: Problem>(problem: P, mut aba: Aba) -> Result<P::Output> {
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses = aba.derive_clauses();
+    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
     // Append additional clauses as defined by the problem
     let additional_clauses = problem.additional_clauses(&aba);
     // Convert the total of our derived clauses using the mapper
@@ -99,12 +98,8 @@ pub fn solve<P: Problem>(problem: P, mut aba: Aba) -> Result<P::Output> {
     }
 }
 
-pub fn multishot_solve<A: Atom, P: MultishotProblem<A>>(
-    mut problem: P,
-    mut aba: Aba,
-) -> Result<P::Output> {
-    // Trim the ABA, this is always safe
-    aba.trim();
+pub fn multishot_solve<P: MultishotProblem>(mut problem: P, aba: Aba) -> Result<P::Output> {
+    let aba = aba.prepare();
     // Let the problem perform additional checks before starting the solver
     problem.check(&aba)?;
     // Create a map that will keep track of the translation between
@@ -113,7 +108,7 @@ pub fn multishot_solve<A: Atom, P: MultishotProblem<A>>(
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses = aba.derive_clauses();
+    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
     // Convert the total of our derived clauses using the mapper
     // and feed the solver with the result
     map.as_raw_iter(&clauses)
