@@ -1,8 +1,17 @@
-use std::collections::HashSet;
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs::File,
+    io::Write,
+};
 
+use graph_cycles::Cycles;
 use iter_tools::Itertools;
+use petgraph::{
+    dot::{Config, Dot},
+    graph::DiGraph,
+};
 
-use crate::{aba::Num, clauses::Clause, graph::Graph, literal::TheoryAtom};
+use crate::{aba::Num, clauses::Clause, literal::TheoryAtom};
 
 use super::{theory::theory_helper, Aba, RuleList};
 
@@ -28,26 +37,19 @@ impl PreparedAba {
         self.loops.iter().flat_map(|r#loop| {
             let mut head_list: Vec<_> = r#loop.heads.iter().collect();
             head_list.push(head_list[0]);
-            let loop_enforcement_clauses =
-                head_list
-                    .into_iter()
-                    .tuple_windows()
-                    .flat_map(|(first, second)| {
-                        [
-                            Clause::from(vec![I::new(*first).pos(), I::new(*second).pos()]),
-                            Clause::from(vec![I::new(*first).neg(), I::new(*second).neg()]),
-                        ]
-                    });
-            let head_sample = *r#loop.heads.iter().next().unwrap();
             let body_rules = r#loop.support.iter().map(|(_head, body)| body);
-            let clauses = body_rules.multi_cartesian_product().map(move |product| {
-                product
-                    .into_iter()
-                    .map(|elem| I::new(*elem).pos())
-                    .chain(std::iter::once(I::new(head_sample).neg()))
-                    .collect()
-            });
-            loop_enforcement_clauses.chain(clauses)
+            let clauses = body_rules
+                .multi_cartesian_product()
+                .flat_map(move |product| {
+                    r#loop.heads.iter().map(move |head| {
+                        product
+                            .iter()
+                            .map(|elem| I::new(**elem).pos())
+                            .chain(std::iter::once(I::new(*head).neg()))
+                            .collect()
+                    })
+                });
+            clauses
         })
     }
 }
@@ -84,38 +86,51 @@ fn trim_unreachable_rules(aba: &mut Aba) {
 }
 
 fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
-    // Construct the graph containing all elements of the universe
-    // with edges based on the aba's rules
-    let graph = aba.rules.iter().fold(Graph::new(), |graph, (head, body)| {
-        body.iter().fold(graph, |mut graph, elem| {
-            graph.add_edge(*elem, *head);
-            graph
+    let mut graph = DiGraph::<Num, ()>::new();
+    let universe = aba
+        .universe()
+        .unique()
+        .scan(&mut graph, |graph, element| {
+            let idx = graph.add_node(*element);
+            Some((*element, idx))
         })
+        .collect::<BTreeMap<_, _>>();
+    aba.rules
+        .iter()
+        .flat_map(|(head, body)| body.iter().map(|body_element| (*body_element, *head)))
+        .for_each(|(from, to)| {
+            let from = universe.get(&from).unwrap();
+            let to = universe.get(&to).unwrap();
+            graph.update_edge(*from, *to, ());
+        });
+    let mut file = File::create("./graph.gv").unwrap();
+    let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+    write!(file, "{dot:?}").unwrap();
+    // TODO: Write on debug, simplify for production
+    let mut loops = vec![];
+    graph.visit_cycles(|graph, cycle| {
+        let heads = cycle.iter().map(|idx| graph[*idx]).collect::<HashSet<_>>();
+        let loop_rules = aba
+            .rules
+            .iter()
+            .filter(|(head, _body)| heads.contains(head));
+        // Relevant rules are those that contain only elements from outside the loop
+        // All other rules cannot influence the value of the loop
+        let support = loop_rules
+            .filter(|(_head, body)| body.is_disjoint(&heads))
+            .cloned()
+            .collect();
+        loops.push(r#Loop { heads, support });
+        if loops.len() >= universe.len() {
+            if loops.len() == universe.len() {
+                eprintln!("Too... many... cycles... Aborting cycle detection. Solver? You're on your own now");
+            }
+            std::ops::ControlFlow::Break(())
+        } else {
+            std::ops::ControlFlow::Continue(())
+        }
     });
-    // Use a linear time algorithm to calculate the strongly connected
-    // components of the derived graph
-    let scc = graph.tarjan_scc();
-    // Loops are strongly connected components that have more than one element
-    // These are just the largest loops. There may be smaller loops inside loops
-    // but it should suffice to prevent these loops
-    let loops = scc.into_iter().filter(|component| component.len() > 1);
-    // Iterate over all loops and apply the fixing-logic
     loops
-        .map(|heads| {
-            let heads: HashSet<_> = heads.into_iter().map(|head| head as Num).collect();
-            let loop_rules = aba
-                .rules
-                .iter()
-                .filter(|(head, _body)| heads.contains(head));
-            // Relevant rules are those that contain only elements from outside the loop
-            // All other rules cannot influence the value of the loop
-            let support = loop_rules
-                .filter(|(_head, body)| body.is_disjoint(&heads))
-                .cloned()
-                .collect();
-            r#Loop { heads, support }
-        })
-        .collect()
 }
 
 impl From<Aba> for PreparedAba {

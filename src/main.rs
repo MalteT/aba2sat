@@ -29,7 +29,6 @@ mod aba;
 mod args;
 mod clauses;
 mod error;
-mod graph;
 mod literal;
 mod mapper;
 mod parser;
