@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use cadical::Solver;
 
 use crate::{
@@ -51,6 +53,12 @@ pub trait MultishotProblem {
 /// *(Literal)* `A` is element of `th(S)`
 #[derive(Debug)]
 pub struct SetTheory(Num);
+
+impl From<SetTheory> for (Num, Option<NonZeroUsize>) {
+    fn from(value: SetTheory) -> Self {
+        (value.0, None)
+    }
+}
 
 impl From<Num> for SetTheory {
     fn from(value: Num) -> Self {

@@ -4,17 +4,17 @@ use cadical::Solver;
 
 use crate::{
     clauses::{Clause, RawClause},
-    literal::Literal,
+    literal::{Literal, RawLiteral},
 };
 
 #[derive(Debug, Default)]
 pub struct Mapper {
-    map: HashMap<String, u32>,
+    map: HashMap<RawLiteral, u32>,
 }
 
 pub enum ReconstructedLiteral {
-    Pos(String),
-    Neg(String),
+    Pos(RawLiteral),
+    Neg(RawLiteral),
 }
 
 impl Mapper {
@@ -34,10 +34,10 @@ impl Mapper {
     }
 
     pub fn as_raw(&mut self, lit: &Literal) -> i32 {
-        let key = self.map.get(lit.as_str()).copied().unwrap_or_else(|| {
+        let key = self.map.get(lit).copied().unwrap_or_else(|| {
             debug_assert!(self.map.len() <= i32::MAX as usize, "Mapper overflowed");
             let new = self.map.len() as u32 + 1;
-            self.map.insert(lit.to_string(), new);
+            self.map.insert((**lit).clone(), new);
             new
         }) as i32;
         match lit {
@@ -51,24 +51,23 @@ impl Mapper {
         sat: &'s Solver,
     ) -> impl Iterator<Item = ReconstructedLiteral> + 's {
         self.map.iter().flat_map(|(lit, raw)| {
-            let (_, lit) = lit.split_once('#').expect("All literals must contain a #");
             sat.value(*raw as i32).map(|result| match result {
-                true => ReconstructedLiteral::Pos(lit.to_owned()),
-                false => ReconstructedLiteral::Neg(lit.to_owned()),
+                true => ReconstructedLiteral::Pos(lit.clone()),
+                false => ReconstructedLiteral::Neg(lit.clone()),
             })
         })
     }
 
     pub fn get_raw(&self, lit: &Literal) -> Option<i32> {
-        self.map.get(lit.as_str()).map(|&raw| raw as i32)
+        self.map.get(lit).map(|&raw| raw as i32)
     }
 }
 
 impl std::fmt::Debug for ReconstructedLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ReconstructedLiteral::Pos(str) => write!(f, "+{str}"),
-            ReconstructedLiteral::Neg(str) => write!(f, "-{str}"),
+            ReconstructedLiteral::Pos(str) => write!(f, "+{str:?}"),
+            ReconstructedLiteral::Neg(str) => write!(f, "-{str:?}"),
         }
     }
 }

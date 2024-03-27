@@ -1,6 +1,7 @@
 use std::{
     any::{Any, TypeId},
     fmt::Debug,
+    num::NonZeroUsize,
 };
 
 use crate::aba::Num;
@@ -13,8 +14,8 @@ pub enum Literal {
 }
 
 /// New type to prevent creation of arbitrary SAT literals
-#[derive(Clone, Debug)]
-pub struct RawLiteral(String);
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct RawLiteral(TypeId, Num, Option<NonZeroUsize>);
 
 /// Convert the type into it's literal
 #[doc(notable_trait)]
@@ -32,9 +33,10 @@ pub trait IntoLiteral: Sized {
 }
 
 /// Implement [`IntoLiteral`] for all types that are 'static, sized and debuggable
-impl<T: Any + Debug + Sized> IntoLiteral for T {
+impl<T: Any + Into<(Num, Option<NonZeroUsize>)>> IntoLiteral for T {
     fn into_literal(self) -> RawLiteral {
-        RawLiteral(format!("{:?}#{:?}", TypeId::of::<T>(), self))
+        let (num, index) = self.into();
+        RawLiteral(TypeId::of::<T>(), num, index)
     }
 }
 
@@ -69,7 +71,7 @@ impl Literal {
 }
 
 impl std::ops::Deref for Literal {
-    type Target = String;
+    type Target = RawLiteral;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -81,22 +83,16 @@ impl std::ops::Deref for Literal {
 impl std::fmt::Debug for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Pos(str) => write!(f, "+{str}"),
-            Literal::Neg(str) => write!(f, "-{str}"),
+            Literal::Pos(str) => write!(f, "+{str:?}"),
+            Literal::Neg(str) => write!(f, "-{str:?}"),
         }
     }
 }
 
-impl std::ops::Deref for RawLiteral {
-    type Target = String;
+// impl std::ops::Deref for RawLiteral {
+//     type Target = String;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for RawLiteral {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
-    }
-}
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }

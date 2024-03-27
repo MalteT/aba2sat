@@ -28,6 +28,7 @@
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
+    num::NonZeroUsize,
 };
 
 use crate::literal::TheoryAtom;
@@ -41,6 +42,12 @@ mod theory;
 
 #[derive(Debug)]
 pub struct Theory(Num);
+
+impl From<Theory> for (Num, Option<NonZeroUsize>) {
+    fn from(value: Theory) -> Self {
+        (value.0, None)
+    }
+}
 
 impl From<Num> for Theory {
     fn from(value: Num) -> Self {
@@ -119,16 +126,22 @@ impl Aba {
 
 #[derive(Debug)]
 struct TheoryHelper<T: TheoryAtom> {
-    _idx: usize,
-    _atom: Num,
+    idx: usize,
+    atom: Num,
     inner: PhantomData<T>,
+}
+
+impl<T: TheoryAtom> From<TheoryHelper<T>> for (Num, Option<NonZeroUsize>) {
+    fn from(value: TheoryHelper<T>) -> Self {
+        (value.atom, NonZeroUsize::new(value.idx + 1))
+    }
 }
 
 impl<T: TheoryAtom> TheoryHelper<T> {
     fn new(idx: usize, atom: Num) -> Self {
         Self {
-            _idx: idx,
-            _atom: atom,
+            idx,
+            atom,
             inner: PhantomData,
         }
     }

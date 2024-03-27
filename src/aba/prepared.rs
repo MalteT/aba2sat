@@ -123,7 +123,7 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
         loops.push(r#Loop { heads, support });
         if loops.len() >= universe.len() {
             if loops.len() == universe.len() {
-                eprintln!("Too... many... cycles... Aborting cycle detection. Solver? You're on your own now");
+                eprintln!("Too... many... cycles... Aborting cycle detection with {} cycles. Solver? You're on your own now", loops.len());
             }
             std::ops::ControlFlow::Break(())
         } else {
