@@ -103,11 +103,15 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
             let to = universe.get(&to).unwrap();
             graph.update_edge(*from, *to, ());
         });
-    let mut file = File::create("./graph.gv").unwrap();
-    let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
-    write!(file, "{dot:?}").unwrap();
-    // TODO: Write on debug, simplify for production
+    #[cfg(debug_assertions)]
+    {
+        let mut file = File::create("./graph.gv").unwrap();
+        let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+        write!(file, "{dot:?}").unwrap();
+    }
     let mut loops = vec![];
+    const LOOP_SIZE_IN_MULT_UNIVERSE_SIZE: f32 = 0.2;
+    let mut output_printed = false;
     graph.visit_cycles(|graph, cycle| {
         let heads = cycle.iter().map(|idx| graph[*idx]).collect::<HashSet<_>>();
         let loop_rules = aba
@@ -121,9 +125,10 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
             .cloned()
             .collect();
         loops.push(r#Loop { heads, support });
-        if loops.len() >= universe.len() {
-            if loops.len() == universe.len() {
+        if loops.len() >= (LOOP_SIZE_IN_MULT_UNIVERSE_SIZE * universe.len() as f32) as usize {
+            if ! output_printed {
                 eprintln!("Too... many... cycles... Aborting cycle detection with {} cycles. Solver? You're on your own now", loops.len());
+                output_printed = true;
             }
             std::ops::ControlFlow::Break(())
         } else {
