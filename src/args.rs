@@ -1,6 +1,11 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use lazy_static::lazy_static;
+
+lazy_static! {
+    pub static ref ARGS: Option<Args> = Args::try_parse().ok();
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -17,8 +22,13 @@ use clap::{Parser, Subcommand};
 pub struct Args {
     #[command(subcommand)]
     pub problem: Problems,
-    #[arg(long, short)]
+    /// File to load the aba from
+    #[arg(long, short, value_name = "PATH")]
     pub file: PathBuf,
+    /// Maximum number of loops to break before starting the solving process.
+    /// Will use the number of atoms by default.
+    #[arg(long, short = 'l', value_name = "COUNT")]
+    pub max_loops: Option<usize>,
 }
 
 #[allow(clippy::enum_variant_names)]

@@ -14,6 +14,7 @@ use aba::{
     },
     Num,
 };
+use args::ARGS;
 use clap::Parser;
 
 use crate::error::{Error, Result};
@@ -40,14 +41,19 @@ trait IccmaFormattable {
 }
 
 fn __main() -> Result {
-    let args = args::Args::parse();
-
+    let args = match &*ARGS {
+        Some(args) => args,
+        None => {
+            args::Args::parse();
+            unreachable!()
+        }
+    };
     let content = read_to_string(&args.file).map_err(Error::OpeningAbaFile)?;
     let aba = parser::aba_file(&content)?;
-    let result = match args.problem {
+    let result = match &args.problem {
         args::Problems::VerifyAdmissibility { set } => aba::problems::solve(
             VerifyAdmissibleExtension {
-                assumptions: set.into_iter().collect(),
+                assumptions: set.iter().cloned().collect(),
             },
             aba,
         )?
@@ -60,13 +66,13 @@ fn __main() -> Result {
             aba::problems::solve(SampleAdmissibleExtension, aba)?.fmt_iccma()
         }
         args::Problems::DecideCredulousAdmissibility { query } => {
-            aba::problems::solve(DecideCredulousAdmissibility { element: query }, aba)?.fmt_iccma()
+            aba::problems::solve(DecideCredulousAdmissibility { element: *query }, aba)?.fmt_iccma()
         }
         args::Problems::EnumerateComplete => {
             aba::problems::multishot_solve(EnumerateCompleteExtensions::default(), aba)?.fmt_iccma()
         }
         args::Problems::DecideCredulousComplete { query } => {
-            aba::problems::solve(DecideCredulousComplete { element: query }, aba)?.fmt_iccma()
+            aba::problems::solve(DecideCredulousComplete { element: *query }, aba)?.fmt_iccma()
         }
     }?;
     let mut stdout = std::io::stdout().lock();

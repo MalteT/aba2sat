@@ -6,7 +6,7 @@ use crate::{
     clauses::{Clause, ClauseList},
     error::Error,
     literal::{
-        lits::{Theory, TheorySet, TheorySetHelper, TheorySetRuleBodyActive},
+        lits::{Theory, TheorySet},
         IntoLiteral,
     },
     Result,
@@ -38,8 +38,7 @@ pub struct DecideCredulousAdmissibility {
 pub fn initial_admissibility_clauses(aba: &PreparedAba) -> ClauseList {
     let mut clauses = vec![];
     // Create inference for the problem set
-    aba.derive_clauses::<TheorySet, TheorySetHelper, TheorySetRuleBodyActive>()
-        .collect_into(&mut clauses);
+    aba.derive_clauses::<TheorySet>().collect_into(&mut clauses);
     // Attack the inference of the aba, if an attack exists
     for (assumption, inverse) in &aba.inverses {
         [

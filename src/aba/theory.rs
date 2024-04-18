@@ -1,15 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    clauses::{Clause, ClauseList},
-    literal::{IntoLiteral, Literal, RawLiteral},
-};
+use crate::{clauses::Clause, literal::IntoLiteral};
 
-use super::{prepared::PreparedAba, Num};
+use super::{prepared::PreparedAba, Context};
 
-/// Generate the logic for theory derivation in the given [`Aba`]
-///
-/// This will need a valid [`TheoryAtom`] that will be used to construct the logic
+/// Generate the logic for theory derivation in the given [`Aba`](crate::aba::Aba)
 ///
 /// # Explanation
 ///
@@ -32,21 +27,16 @@ use super::{prepared::PreparedAba, Num};
 ///   A lot of the overhead is due to the fact that multiple bodies are an option, if that's
 ///   not given for a head `p` we use the simplified translation logic where `p` is true iff
 ///   `bodies(p)` is true.
-pub fn theory_helper<
-    Theory: From<Num> + Into<RawLiteral>,
-    Helper: From<(usize, Num)> + Into<RawLiteral>,
->(
-    aba: &PreparedAba,
-) -> impl Iterator<Item = Clause> + '_ {
+pub fn theory_helper<Ctx: Context>(aba: &PreparedAba) -> impl Iterator<Item = Clause> + '_ {
     // The combined list of rules, such that every
-    // head is unique and possible contains a list of bodies
-    let mut rules_combined =
-        aba.rules
-            .iter()
-            .fold(HashMap::<_, Vec<_>>::new(), |mut rules, (head, body)| {
-                rules.entry(head).or_default().push(body);
-                rules
-            });
+    // head is unique and possible contains a list of body rule ids
+    let mut rules_combined = aba.rules.iter().enumerate().fold(
+        HashMap::<_, Vec<_>>::new(),
+        |mut rules, (rule_id, (head, _body))| {
+            rules.entry(head).or_default().push(rule_id);
+            rules
+        },
+    );
     // All atoms that can be derived by rules
     let rule_heads: HashSet<_> = aba.rule_heads().collect();
     // For every non-assumption, that is not derivable add a rule without a body,
@@ -61,49 +51,48 @@ pub fn theory_helper<
     // These are heads with any number of bodies, possibly none
     rules_combined
         .into_iter()
-        .flat_map(|(head, bodies)| match &bodies[..] {
+        .flat_map(|(head, rule_ids)| match &rule_ids[..] {
             // No bodies, add a clause that prevents the head from accuring in the theory
             [] => {
-                vec![Clause::from(vec![Theory::from(*head).neg()])]
+                vec![Clause::from(vec![Ctx::Base::from(*head).neg()])]
             }
             // A single body only, this is equivalent to a head that can only be derived by a single rule
-            [body] => body_to_clauses::<Theory>(Theory::from(*head).pos(), body),
-            // n bodies, we'll need to take extra care to allow any number of bodies to derive this
-            // head without logic errors
-            bodies => {
+            // H <=> RBA_rule_id
+            [rule_id] => {
+                vec![
+                    Clause::from(vec![
+                        Ctx::Base::from(*head).pos(),
+                        Ctx::Rule::from(*rule_id).neg(),
+                    ]),
+                    Clause::from(vec![
+                        Ctx::Base::from(*head).neg(),
+                        Ctx::Rule::from(*rule_id).pos(),
+                    ]),
+                ]
+            }
+            // n bodies for this head
+            // ```text
+            //    H <=> RBA_1 or ... or RBA_n
+            // ⋄  (-H or RBA_1 or ... or RBA_n) and (-RBA_1 or H) and ... (-RBA_n or H)
+            // ````
+            rule_ids => {
                 let mut clauses = vec![];
-                bodies
+                rule_ids
                     .iter()
-                    .enumerate()
-                    .flat_map(|(idx, body)| {
-                        body_to_clauses::<Theory>(Helper::from((idx, *head)).pos(), body)
+                    .map(|rule_id| {
+                        Clause::from(vec![
+                            Ctx::Base::from(*head).pos(),
+                            Ctx::Rule::from(*rule_id).neg(),
+                        ])
                     })
                     .collect_into(&mut clauses);
-                let helpers: Vec<_> = (0..bodies.len())
-                    .map(|idx| Helper::from((idx, *head)).pos())
+                let last_clause = rule_ids
+                    .iter()
+                    .map(|rule_id| Ctx::Rule::from(*rule_id).pos())
+                    .chain(std::iter::once(Ctx::Base::from(*head).neg()))
                     .collect();
-                let mut right_implification: Clause = helpers.iter().cloned().collect();
-                right_implification.push(Theory::from(*head).neg());
-                clauses.push(right_implification);
-                helpers
-                    .into_iter()
-                    .map(|helper| Clause::from(vec![Theory::from(*head).pos(), helper.negative()]))
-                    .collect_into(&mut clauses);
+                clauses.push(last_clause);
                 clauses
             }
         })
-}
-
-fn body_to_clauses<Theory: From<Num> + Into<RawLiteral>>(
-    head: Literal,
-    body: &HashSet<Num>,
-) -> ClauseList {
-    let mut clauses = vec![];
-    let mut left_implication: Clause = body.iter().map(|elem| Theory::from(*elem).neg()).collect();
-    left_implication.push(head.clone().positive());
-    clauses.push(left_implication);
-    body.iter()
-        .map(|elem| vec![head.clone().negative(), Theory::from(*elem).pos()].into())
-        .collect_into(&mut clauses);
-    clauses
 }

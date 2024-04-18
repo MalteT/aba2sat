@@ -27,6 +27,8 @@
 //! ```
 use std::collections::{HashMap, HashSet};
 
+use crate::literal::RawLiteral;
+
 use self::prepared::PreparedAba;
 
 pub mod debug;
@@ -80,6 +82,7 @@ impl Aba {
         self.universe().any(|e| *e == *elem)
     }
 
+    #[cfg(debug_assertions)]
     pub fn size(&self) -> usize {
         let inverses = self
             .inverses
@@ -101,4 +104,19 @@ impl Aba {
     fn rule_heads(&self) -> impl Iterator<Item = &Num> + '_ {
         self.rules.iter().map(|(head, _)| head)
     }
+}
+
+pub trait Context {
+    type Base: From<Num> + Into<RawLiteral> + 'static;
+    type Rule: From<usize> + Into<RawLiteral> + 'static;
+}
+
+impl Context for crate::literal::lits::Theory {
+    type Base = Self;
+    type Rule = crate::literal::lits::TheoryRuleBodyActive;
+}
+
+impl Context for crate::literal::lits::TheorySet {
+    type Base = Self;
+    type Rule = crate::literal::lits::TheorySetRuleBodyActive;
 }

@@ -39,11 +39,11 @@ use crate::aba::{Aba, Num};
 use crate::error::Result;
 
 pub fn aba_file(input: &str) -> Result<Aba> {
-    let (input, number_of_atoms) = p_line(input)?;
+    let (input, _number_of_atoms) = p_line(input)?;
     let (_, aba) = all_consuming(aba)(input)?;
     #[cfg(debug_assertions)]
     {
-        if aba.size() != number_of_atoms as usize {
+        if aba.size() != _number_of_atoms as usize {
             eprintln!("Number of atoms did not match p-line!");
         }
     }

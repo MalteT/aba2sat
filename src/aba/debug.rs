@@ -20,7 +20,7 @@ impl DebugAba {
         self
     }
 
-    pub fn with_rule<'n, B: IntoIterator<Item = char>>(mut self, head: char, body: B) -> Self {
+    pub fn with_rule<B: IntoIterator<Item = char>>(mut self, head: char, body: B) -> Self {
         let head = self.forward(head);
         let body: Vec<_> = body
             .into_iter()

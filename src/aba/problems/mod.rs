@@ -3,7 +3,7 @@ use cadical::Solver;
 use crate::{
     clauses::ClauseList,
     error::{Error, Result},
-    literal::lits::{Theory, TheoryHelper, TheoryRuleBodyActive},
+    literal::lits::Theory,
     mapper::Mapper,
 };
 
@@ -59,9 +59,7 @@ pub fn solve<P: Problem>(problem: P, aba: Aba) -> Result<P::Output> {
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses: ClauseList = aba
-        .derive_clauses::<Theory, TheoryHelper, TheoryRuleBodyActive>()
-        .collect();
+    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
     // Append additional clauses as defined by the problem
     let additional_clauses = problem.additional_clauses(&aba);
     // Convert the total of our derived clauses using the mapper
@@ -101,9 +99,7 @@ pub fn multishot_solve<P: MultishotProblem>(mut problem: P, aba: Aba) -> Result<
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses: ClauseList = aba
-        .derive_clauses::<Theory, TheoryHelper, TheoryRuleBodyActive>()
-        .collect();
+    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
     // Convert the total of our derived clauses using the mapper
     // and feed the solver with the result
     map.as_raw_iter(&clauses)

@@ -45,20 +45,12 @@ pub mod lits {
     into_raw!(Theory from Num);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct TheoryHelper(usize, Num);
-    into_raw!(TheoryHelper from usize, Num);
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct TheoryRuleBodyActive(usize);
     into_raw!(TheoryRuleBodyActive from usize);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct TheorySet(Num);
     into_raw!(TheorySet from Num);
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct TheorySetHelper(usize, Num);
-    into_raw!(TheorySetHelper from usize, Num);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct TheorySetRuleBodyActive(usize);
@@ -83,10 +75,8 @@ pub enum Literal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RawLiteral {
     Theory(lits::Theory),
-    TheoryHelper(lits::TheoryHelper),
     TheoryRuleBodyActive(lits::TheoryRuleBodyActive),
     TheorySet(lits::TheorySet),
-    TheorySetHelper(lits::TheorySetHelper),
     TheorySetRuleBodyActive(lits::TheorySetRuleBodyActive),
     LoopHelper(lits::LoopHelper),
 }
@@ -110,22 +100,6 @@ pub trait IntoLiteral: Sized {
 impl<T: Into<RawLiteral>> IntoLiteral for T {
     fn into_literal(self) -> RawLiteral {
         self.into()
-    }
-}
-
-impl Literal {
-    pub fn negative(self) -> Self {
-        Self::Neg(self.into_inner())
-    }
-
-    pub fn positive(self) -> Self {
-        Self::Pos(self.into_inner())
-    }
-
-    pub fn into_inner(self) -> RawLiteral {
-        match self {
-            Literal::Pos(inner) | Literal::Neg(inner) => inner,
-        }
     }
 }
 

@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use cadical::Solver;
-
 use crate::{
     clauses::{Clause, RawClause},
     literal::{Literal, RawLiteral},
@@ -41,7 +39,11 @@ impl Mapper {
         }
     }
 
-    pub fn reconstruct<'s>(&'s self, sat: &'s Solver) -> impl Iterator<Item = Literal> + 's {
+    #[cfg(debug_assertions)]
+    pub fn reconstruct<'s>(
+        &'s self,
+        sat: &'s cadical::Solver,
+    ) -> impl Iterator<Item = Literal> + 's {
         self.map.iter().flat_map(|(lit, raw)| {
             sat.value(*raw as i32).map(|result| match result {
                 true => Literal::Pos(*lit),

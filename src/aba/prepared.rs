@@ -1,26 +1,19 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    fs::File,
-    io::Write,
-};
+use std::collections::{BTreeMap, HashSet};
 
 use graph_cycles::Cycles;
 use iter_tools::Itertools;
-use petgraph::{
-    dot::{Config, Dot},
-    graph::DiGraph,
-};
 
 use crate::{
     aba::Num,
+    args::ARGS,
     clauses::Clause,
     literal::{
         lits::{LoopHelper, TheoryRuleBodyActive},
-        IntoLiteral, RawLiteral,
+        IntoLiteral,
     },
 };
 
-use super::{theory::theory_helper, Aba};
+use super::{theory::theory_helper, Aba, Context};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct r#Loop {
@@ -36,16 +29,10 @@ pub struct PreparedAba {
 
 impl PreparedAba {
     /// Translate the ABA into base rules / definitions for SAT solving
-    pub fn derive_clauses<
-        Theory: From<Num> + Into<RawLiteral> + 'static,
-        Helper: From<(usize, Num)> + Into<RawLiteral> + 'static,
-        TheoryRuleActive: From<usize> + Into<RawLiteral> + 'static,
-    >(
-        &self,
-    ) -> impl Iterator<Item = Clause> + '_ {
-        theory_helper::<Theory, Helper>(self)
-            .chain(self.derive_loop_breaker::<Theory>())
-            .chain(self.derive_rule_helper::<Theory, TheoryRuleActive>())
+    pub fn derive_clauses<Ctx: Context>(&self) -> impl Iterator<Item = Clause> + '_ {
+        theory_helper::<Ctx>(self)
+            .chain(self.derive_loop_breaker::<Ctx>())
+            .chain(self.derive_rule_helper::<Ctx>())
     }
 
     /// Derive [`Clause`]s to ground the found loops
@@ -78,9 +65,7 @@ impl PreparedAba {
     /// ⋄  -l or LH_i
     /// ```
     /// This will result in `|L| + 1` new clauses per loop.
-    fn derive_loop_breaker<Theory: From<Num> + IntoLiteral>(
-        &self,
-    ) -> impl Iterator<Item = Clause> + '_ {
+    fn derive_loop_breaker<Ctx: Context>(&self) -> impl Iterator<Item = Clause> + '_ {
         // Iterate over all loops
         self.loops.iter().enumerate().flat_map(|(loop_id, r#loop)| {
             // -LH_i or RBA_1 or ... or RBA_n
@@ -94,7 +79,7 @@ impl PreparedAba {
             let head_clauses = r#loop.heads.iter().map(move |head| {
                 Clause::from(vec![
                     LoopHelper::from(loop_id).pos(),
-                    Theory::from(*head).neg(),
+                    Ctx::Base::from(*head).neg(),
                 ])
             });
             // LH_i or -RBA_x
@@ -118,30 +103,25 @@ impl PreparedAba {
     ///    RBA_i <=> b_1 and ... and b_n
     /// ⋄  (-RBA_i or b_1) and ... and (-RBA_i or b_n) and (RBA_i or -b_1 or ... or -b_n)
     /// ```
-    /// we will use [`RuleBodyActive`] for `x_R`.
-    fn derive_rule_helper<
-        Theory: From<Num> + Into<RawLiteral> + 'static,
-        TheoryRuleActive: From<usize> + Into<RawLiteral> + 'static,
-    >(
-        &self,
-    ) -> impl Iterator<Item = Clause> + '_ {
+    /// we will use the `TheoryRuleActive` for `x_R`.
+    fn derive_rule_helper<Ctx: Context>(&self) -> impl Iterator<Item = Clause> + '_ {
         self.rules
             .iter()
             .enumerate()
             .flat_map(|(rule_id, (_head, body))| {
                 if body.is_empty() {
-                    vec![Clause::from(vec![TheoryRuleActive::from(rule_id).neg()])]
+                    vec![Clause::from(vec![Ctx::Rule::from(rule_id).neg()])]
                 } else {
                     let last_clause = body
                         .iter()
-                        .map(|el| Theory::from(*el).neg())
-                        .chain(std::iter::once(TheoryRuleActive::from(rule_id).pos()))
+                        .map(|el| Ctx::Base::from(*el).neg())
+                        .chain(std::iter::once(Ctx::Rule::from(rule_id).pos()))
                         .collect();
                     body.iter()
                         .map(move |el| {
                             Clause::from(vec![
-                                TheoryRuleActive::from(rule_id).neg(),
-                                Theory::from(*el).pos(),
+                                Ctx::Rule::from(rule_id).neg(),
+                                Ctx::Base::from(*el).pos(),
                             ])
                         })
                         .chain([last_clause])
@@ -183,7 +163,7 @@ fn trim_unreachable_rules(aba: &mut Aba) {
 }
 
 fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
-    let mut graph = DiGraph::<Num, ()>::new();
+    let mut graph = petgraph::graph::DiGraph::<Num, ()>::new();
     let universe = aba
         .universe()
         .unique()
@@ -202,12 +182,18 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
         });
     #[cfg(debug_assertions)]
     {
+        use std::{fs::File, io::Write};
         let mut file = File::create("./graph.gv").unwrap();
-        let dot = Dot::with_config(&graph, &[Config::EdgeNoLabel]);
+        let dot = petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
         write!(file, "{dot:?}").unwrap();
     }
     let mut loops = vec![];
-    const LOOP_SIZE_IN_MULT_UNIVERSE_SIZE: f32 = 0.2;
+    const LOOP_SIZE_IN_MULT_UNIVERSE_SIZE: f32 = 1.0;
+    let max_loops = if let Some(max) = ARGS.as_ref().and_then(|args| args.max_loops) {
+        max
+    } else {
+        (universe.len() as f32 * LOOP_SIZE_IN_MULT_UNIVERSE_SIZE) as usize
+    };
     let mut output_printed = false;
     graph.visit_cycles(|graph, cycle| {
         let heads = cycle.iter().map(|idx| graph[*idx]).collect::<HashSet<_>>();
@@ -223,7 +209,7 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
             .map(|(rule_id, _)| rule_id)
             .collect();
         loops.push(r#Loop { heads, support });
-        if loops.len() >= (LOOP_SIZE_IN_MULT_UNIVERSE_SIZE * universe.len() as f32) as usize {
+        if loops.len() >= max_loops {
             if ! output_printed {
                 eprintln!("Too... many... cycles... Aborting cycle detection with {} cycles. Solver? You're on your own now", loops.len());
                 output_printed = true;
@@ -233,6 +219,7 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
             std::ops::ControlFlow::Continue(())
         }
     });
+    eprintln!("{}", loops.len());
     loops
 }
 
