@@ -1,14 +1,13 @@
-use std::num::NonZeroUsize;
-
 use cadical::Solver;
 
 use crate::{
     clauses::ClauseList,
     error::{Error, Result},
+    literal::lits::{Theory, TheoryHelper, TheoryRuleBodyActive},
     mapper::Mapper,
 };
 
-use super::{prepared::PreparedAba, Aba, Num, Theory};
+use super::{prepared::PreparedAba, Aba};
 
 pub mod admissibility;
 pub mod complete;
@@ -50,22 +49,6 @@ pub trait MultishotProblem {
     }
 }
 
-/// *(Literal)* `A` is element of `th(S)`
-#[derive(Debug)]
-pub struct SetTheory(Num);
-
-impl From<SetTheory> for (Num, Option<NonZeroUsize>) {
-    fn from(value: SetTheory) -> Self {
-        (value.0, None)
-    }
-}
-
-impl From<Num> for SetTheory {
-    fn from(value: Num) -> Self {
-        Self(value)
-    }
-}
-
 pub fn solve<P: Problem>(problem: P, aba: Aba) -> Result<P::Output> {
     let aba = aba.prepare();
     // Let the problem perform additional checks before starting the solver
@@ -76,7 +59,9 @@ pub fn solve<P: Problem>(problem: P, aba: Aba) -> Result<P::Output> {
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
+    let clauses: ClauseList = aba
+        .derive_clauses::<Theory, TheoryHelper, TheoryRuleBodyActive>()
+        .collect();
     // Append additional clauses as defined by the problem
     let additional_clauses = problem.additional_clauses(&aba);
     // Convert the total of our derived clauses using the mapper
@@ -116,7 +101,9 @@ pub fn multishot_solve<P: MultishotProblem>(mut problem: P, aba: Aba) -> Result<
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
+    let clauses: ClauseList = aba
+        .derive_clauses::<Theory, TheoryHelper, TheoryRuleBodyActive>()
+        .collect();
     // Convert the total of our derived clauses using the mapper
     // and feed the solver with the result
     map.as_raw_iter(&clauses)

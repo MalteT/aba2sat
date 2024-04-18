@@ -11,14 +11,21 @@ use petgraph::{
     graph::DiGraph,
 };
 
-use crate::{aba::Num, clauses::Clause, literal::TheoryAtom};
+use crate::{
+    aba::Num,
+    clauses::Clause,
+    literal::{
+        lits::{LoopHelper, TheoryRuleBodyActive},
+        IntoLiteral, RawLiteral,
+    },
+};
 
-use super::{theory::theory_helper, Aba, RuleList};
+use super::{theory::theory_helper, Aba};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct r#Loop {
     heads: HashSet<Num>,
-    support: RuleList,
+    support: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,28 +36,118 @@ pub struct PreparedAba {
 
 impl PreparedAba {
     /// Translate the ABA into base rules / definitions for SAT solving
-    pub fn derive_clauses<I: TheoryAtom>(&self) -> impl Iterator<Item = Clause> + '_ {
-        theory_helper::<I>(self).chain(self.derive_loop_breaker::<I>())
+    pub fn derive_clauses<
+        Theory: From<Num> + Into<RawLiteral> + 'static,
+        Helper: From<(usize, Num)> + Into<RawLiteral> + 'static,
+        TheoryRuleActive: From<usize> + Into<RawLiteral> + 'static,
+    >(
+        &self,
+    ) -> impl Iterator<Item = Clause> + '_ {
+        theory_helper::<Theory, Helper>(self)
+            .chain(self.derive_loop_breaker::<Theory>())
+            .chain(self.derive_rule_helper::<Theory, TheoryRuleActive>())
     }
 
-    fn derive_loop_breaker<I: TheoryAtom>(&self) -> impl Iterator<Item = Clause> + '_ {
-        self.loops.iter().flat_map(|r#loop| {
-            let mut head_list: Vec<_> = r#loop.heads.iter().collect();
-            head_list.push(head_list[0]);
-            let body_rules = r#loop.support.iter().map(|(_head, body)| body);
-            let clauses = body_rules
-                .multi_cartesian_product()
-                .flat_map(move |product| {
-                    r#loop.heads.iter().map(move |head| {
-                        product
-                            .iter()
-                            .map(|elem| I::new(**elem).pos())
-                            .chain(std::iter::once(I::new(*head).neg()))
-                            .collect()
-                    })
-                });
-            clauses
+    /// Derive [`Clause`]s to ground the found loops
+    ///
+    /// Given the loop based on these rules
+    /// ```text
+    /// p <- q
+    /// q <- p
+    /// q <- a
+    /// p <- b
+    /// ```
+    /// the breaker will derive the formulas
+    /// ```text
+    /// p => a v b
+    /// q => a v b
+    /// ```
+    /// or, in the more general case for Loop `L` and incoming rules `Ri = {ri1, ..., rin}`, where all elements of the body of a rule are outside of the loop, we have for all elements `l in L` with id `i`:
+    /// ```text
+    /// l => and(body(ri1)) or ... or and(body(rln))
+    /// ```
+    /// where body(h <- B) = B and and({a1, ..., ax}) = a1 and ... and ax.
+    ///
+    /// This will lead to an exponential explosion when converted to naively CNF,
+    /// since the formulas are mostly DNF. We use Tseitin's transformation to prevent this:
+    /// ```text
+    ///    LH_i <=> RBA_1 or ... or RBA_n
+    /// ⋄  (LH_i or -RBA_1) and ... and (LH_i or -RBA_n) and (-LH_i or RBA_1 or ... or RBA_n)
+    ///
+    ///    l => LH_i
+    /// ⋄  -l or LH_i
+    /// ```
+    /// This will result in `|L| + 1` new clauses per loop.
+    fn derive_loop_breaker<Theory: From<Num> + IntoLiteral>(
+        &self,
+    ) -> impl Iterator<Item = Clause> + '_ {
+        // Iterate over all loops
+        self.loops.iter().enumerate().flat_map(|(loop_id, r#loop)| {
+            // -LH_i or RBA_1 or ... or RBA_n
+            let last_clause = r#loop
+                .support
+                .iter()
+                .map(|el| TheoryRuleBodyActive::from(*el).pos())
+                .chain(std::iter::once(LoopHelper::from(loop_id).neg()))
+                .collect();
+            // -l or LH_i
+            let head_clauses = r#loop.heads.iter().map(move |head| {
+                Clause::from(vec![
+                    LoopHelper::from(loop_id).pos(),
+                    Theory::from(*head).neg(),
+                ])
+            });
+            // LH_i or -RBA_x
+            let tuple_clauses = r#loop.support.iter().map(move |rule_id| {
+                Clause::from(vec![
+                    TheoryRuleBodyActive::from(*rule_id).neg(),
+                    LoopHelper::from(loop_id).pos(),
+                ])
+            });
+            tuple_clauses.chain([last_clause]).chain(head_clauses)
         })
+    }
+
+    /// Derive helper for every rule
+    ///
+    /// This simplifies some thinks massively and is used by the loop breaker
+    /// and prevents exponential explosion for rules with the same head.
+    ///
+    /// For a rule `h <- b_1, ..., b_n with index i in R`, create a helper
+    /// ```text
+    ///    RBA_i <=> b_1 and ... and b_n
+    /// ⋄  (-RBA_i or b_1) and ... and (-RBA_i or b_n) and (RBA_i or -b_1 or ... or -b_n)
+    /// ```
+    /// we will use [`RuleBodyActive`] for `x_R`.
+    fn derive_rule_helper<
+        Theory: From<Num> + Into<RawLiteral> + 'static,
+        TheoryRuleActive: From<usize> + Into<RawLiteral> + 'static,
+    >(
+        &self,
+    ) -> impl Iterator<Item = Clause> + '_ {
+        self.rules
+            .iter()
+            .enumerate()
+            .flat_map(|(rule_id, (_head, body))| {
+                if body.is_empty() {
+                    vec![Clause::from(vec![TheoryRuleActive::from(rule_id).neg()])]
+                } else {
+                    let last_clause = body
+                        .iter()
+                        .map(|el| Theory::from(*el).neg())
+                        .chain(std::iter::once(TheoryRuleActive::from(rule_id).pos()))
+                        .collect();
+                    body.iter()
+                        .map(move |el| {
+                            Clause::from(vec![
+                                TheoryRuleActive::from(rule_id).neg(),
+                                Theory::from(*el).pos(),
+                            ])
+                        })
+                        .chain([last_clause])
+                        .collect()
+                }
+            })
     }
 }
 
@@ -117,12 +214,13 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
         let loop_rules = aba
             .rules
             .iter()
-            .filter(|(head, _body)| heads.contains(head));
+            .enumerate()
+            .filter(|(_rule_id, (head, _body))| heads.contains(head));
         // Relevant rules are those that contain only elements from outside the loop
         // All other rules cannot influence the value of the loop
         let support = loop_rules
-            .filter(|(_head, body)| body.is_disjoint(&heads))
-            .cloned()
+            .filter(|(_rule_id, (_head, body))| body.is_disjoint(&heads))
+            .map(|(rule_id, _)| rule_id)
             .collect();
         loops.push(r#Loop { heads, support });
         if loops.len() >= (LOOP_SIZE_IN_MULT_UNIVERSE_SIZE * universe.len() as f32) as usize {

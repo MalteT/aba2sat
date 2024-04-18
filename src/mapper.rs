@@ -12,11 +12,6 @@ pub struct Mapper {
     map: HashMap<RawLiteral, u32>,
 }
 
-pub enum ReconstructedLiteral {
-    Pos(RawLiteral),
-    Neg(RawLiteral),
-}
-
 impl Mapper {
     pub fn new() -> Self {
         Mapper {
@@ -37,7 +32,7 @@ impl Mapper {
         let key = self.map.get(lit).copied().unwrap_or_else(|| {
             debug_assert!(self.map.len() <= i32::MAX as usize, "Mapper overflowed");
             let new = self.map.len() as u32 + 1;
-            self.map.insert((**lit).clone(), new);
+            self.map.insert(**lit, new);
             new
         }) as i32;
         match lit {
@@ -46,28 +41,16 @@ impl Mapper {
         }
     }
 
-    pub fn reconstruct<'s>(
-        &'s self,
-        sat: &'s Solver,
-    ) -> impl Iterator<Item = ReconstructedLiteral> + 's {
+    pub fn reconstruct<'s>(&'s self, sat: &'s Solver) -> impl Iterator<Item = Literal> + 's {
         self.map.iter().flat_map(|(lit, raw)| {
             sat.value(*raw as i32).map(|result| match result {
-                true => ReconstructedLiteral::Pos(lit.clone()),
-                false => ReconstructedLiteral::Neg(lit.clone()),
+                true => Literal::Pos(*lit),
+                false => Literal::Neg(*lit),
             })
         })
     }
 
     pub fn get_raw(&self, lit: &Literal) -> Option<i32> {
         self.map.get(lit).map(|&raw| raw as i32)
-    }
-}
-
-impl std::fmt::Debug for ReconstructedLiteral {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReconstructedLiteral::Pos(str) => write!(f, "+{str:?}"),
-            ReconstructedLiteral::Neg(str) => write!(f, "-{str:?}"),
-        }
     }
 }

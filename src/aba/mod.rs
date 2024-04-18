@@ -25,13 +25,7 @@
 //! // The result should be true
 //! assert!(result)
 //! ```
-use std::{
-    collections::{HashMap, HashSet},
-    marker::PhantomData,
-    num::NonZeroUsize,
-};
-
-use crate::literal::TheoryAtom;
+use std::collections::{HashMap, HashSet};
 
 use self::prepared::PreparedAba;
 
@@ -39,21 +33,6 @@ pub mod debug;
 mod prepared;
 pub mod problems;
 mod theory;
-
-#[derive(Debug)]
-pub struct Theory(Num);
-
-impl From<Theory> for (Num, Option<NonZeroUsize>) {
-    fn from(value: Theory) -> Self {
-        (value.0, None)
-    }
-}
-
-impl From<Num> for Theory {
-    fn from(value: Num) -> Self {
-        Self(value)
-    }
-}
 
 pub type Rule = (Num, HashSet<Num>);
 pub type RuleList = Vec<Rule>;
@@ -121,28 +100,5 @@ impl Aba {
 
     fn rule_heads(&self) -> impl Iterator<Item = &Num> + '_ {
         self.rules.iter().map(|(head, _)| head)
-    }
-}
-
-#[derive(Debug)]
-struct TheoryHelper<T: TheoryAtom> {
-    idx: usize,
-    atom: Num,
-    inner: PhantomData<T>,
-}
-
-impl<T: TheoryAtom> From<TheoryHelper<T>> for (Num, Option<NonZeroUsize>) {
-    fn from(value: TheoryHelper<T>) -> Self {
-        (value.atom, NonZeroUsize::new(value.idx + 1))
-    }
-}
-
-impl<T: TheoryAtom> TheoryHelper<T> {
-    fn new(idx: usize, atom: Num) -> Self {
-        Self {
-            idx,
-            atom,
-            inner: PhantomData,
-        }
     }
 }

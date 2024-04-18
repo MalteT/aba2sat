@@ -1,16 +1,19 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{prepared::PreparedAba, Aba, Num, Theory},
+    aba::{prepared::PreparedAba, Aba, Num},
     clauses::{Clause, ClauseList},
     error::Error,
-    literal::{IntoLiteral, TheoryAtom},
+    literal::{
+        lits::{Theory, TheorySet},
+        IntoLiteral,
+    },
     Result,
 };
 
 use super::{
     admissibility::initial_admissibility_clauses, LoopControl, MultishotProblem, Problem,
-    SetTheory, SolverState,
+    SolverState,
 };
 
 #[derive(Debug, Default)]
@@ -25,14 +28,14 @@ pub struct DecideCredulousComplete {
 
 fn initial_complete_clauses(aba: &PreparedAba) -> ClauseList {
     // Take everything from admissibility
-    let mut clauses = initial_admissibility_clauses::<SetTheory>(aba);
+    let mut clauses = initial_admissibility_clauses(aba);
     // Additional complete logic
     for (assumption, inverse) in &aba.inverses {
         // For any assumption `a` and it's inverse `b`:
         //   b not in th(A) => a in th(S)
         clauses.push(Clause::from(vec![
-            Theory(*inverse).pos(),
-            SetTheory(*assumption).pos(),
+            Theory::from(*inverse).pos(),
+            TheorySet::from(*assumption).pos(),
         ]));
     }
     clauses
@@ -53,9 +56,9 @@ impl MultishotProblem for EnumerateCompleteExtensions {
                     .assumptions()
                     .map(|assumption| {
                         if just_found.contains(assumption) {
-                            SetTheory::new(*assumption).neg()
+                            TheorySet::from(*assumption).neg()
                         } else {
-                            SetTheory::new(*assumption).pos()
+                            TheorySet::from(*assumption).pos()
                         }
                     })
                     .collect();
@@ -74,7 +77,7 @@ impl MultishotProblem for EnumerateCompleteExtensions {
             .inverses
             .keys()
             .filter_map(|assumption| {
-                let literal = SetTheory::new(*assumption).pos();
+                let literal = TheorySet::from(*assumption).pos();
                 let raw = state.map.get_raw(&literal)?;
                 match state.solver.value(raw) {
                     Some(true) => Some(*assumption),
@@ -96,7 +99,7 @@ impl Problem for DecideCredulousComplete {
 
     fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
         let mut clauses = initial_complete_clauses(aba);
-        clauses.push(Clause::from(vec![SetTheory(self.element).pos()]));
+        clauses.push(Clause::from(vec![TheorySet::from(self.element).pos()]));
         clauses
     }
 

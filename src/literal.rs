@@ -1,10 +1,73 @@
-use std::{
-    any::{Any, TypeId},
-    fmt::Debug,
-    num::NonZeroUsize,
-};
+use std::fmt::Debug;
 
-use crate::aba::Num;
+pub mod lits {
+    use crate::aba::Num;
+
+    macro_rules! into_raw {
+        ($ty:ident) => {
+            impl From<$ty> for crate::literal::RawLiteral {
+                fn from(value: $ty) -> crate::literal::RawLiteral {
+                    crate::literal::RawLiteral::$ty(value)
+                }
+            }
+        };
+        ($ty:ident from $other:ident) => {
+            impl From<$ty> for crate::literal::RawLiteral {
+                fn from(value: $ty) -> crate::literal::RawLiteral {
+                    crate::literal::RawLiteral::$ty(value)
+                }
+            }
+
+            impl From<$other> for $ty {
+                fn from(value: $other) -> Self {
+                    Self(value)
+                }
+            }
+        };
+        ($ty:ident from $( $other:ident ),+ ) => {
+            impl From<$ty> for crate::literal::RawLiteral {
+                fn from(value: $ty) -> crate::literal::RawLiteral {
+                    crate::literal::RawLiteral::$ty(value)
+                }
+            }
+
+            #[allow(non_snake_case)]
+            impl From<($( $other ,)+)> for $ty {
+                fn from(($( $other ),+): ($( $other ),+)) -> Self {
+                    Self($( $other ),+)
+                }
+            }
+        };
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct Theory(Num);
+    into_raw!(Theory from Num);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TheoryHelper(usize, Num);
+    into_raw!(TheoryHelper from usize, Num);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TheoryRuleBodyActive(usize);
+    into_raw!(TheoryRuleBodyActive from usize);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TheorySet(Num);
+    into_raw!(TheorySet from Num);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TheorySetHelper(usize, Num);
+    into_raw!(TheorySetHelper from usize, Num);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TheorySetRuleBodyActive(usize);
+    into_raw!(TheorySetRuleBodyActive from usize);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct LoopHelper(usize);
+    into_raw!(LoopHelper from usize);
+}
 
 /// A Literal can be used in SAT [`Clause`](crate::clauses::Clause)s
 #[derive(Clone)]
@@ -13,9 +76,20 @@ pub enum Literal {
     Neg(RawLiteral),
 }
 
-/// New type to prevent creation of arbitrary SAT literals
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RawLiteral(TypeId, Num, Option<NonZeroUsize>);
+/// All SAT-encodable literals
+///
+/// This is a single type to ease memory and logic, at the cost of having to
+/// extend this type for every new literal type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RawLiteral {
+    Theory(lits::Theory),
+    TheoryHelper(lits::TheoryHelper),
+    TheoryRuleBodyActive(lits::TheoryRuleBodyActive),
+    TheorySet(lits::TheorySet),
+    TheorySetHelper(lits::TheorySetHelper),
+    TheorySetRuleBodyActive(lits::TheorySetRuleBodyActive),
+    LoopHelper(lits::LoopHelper),
+}
 
 /// Convert the type into it's literal
 #[doc(notable_trait)]
@@ -32,25 +106,10 @@ pub trait IntoLiteral: Sized {
     }
 }
 
-/// Implement [`IntoLiteral`] for all types that are 'static, sized and debuggable
-impl<T: Any + Into<(Num, Option<NonZeroUsize>)>> IntoLiteral for T {
+/// Implement [`IntoLiteral`] for all types that can be converted into [`RawLiteral`]s.
+impl<T: Into<RawLiteral>> IntoLiteral for T {
     fn into_literal(self) -> RawLiteral {
-        let (num, index) = self.into();
-        RawLiteral(TypeId::of::<T>(), num, index)
-    }
-}
-
-/// ([`Literal`]) A literal that can be used to construct the logic behind
-/// the theory of a (sub-)set of assumptions (`th(S)`) in an [`Aba`](crate::aba::Aba).
-///
-/// See [`crate::aba::theory_helper`].
-pub trait TheoryAtom: Sized + IntoLiteral + std::fmt::Debug + 'static {
-    fn new(atom: Num) -> Self;
-}
-
-impl<T: From<Num> + Sized + IntoLiteral + std::fmt::Debug + 'static> TheoryAtom for T {
-    fn new(atom: Num) -> Self {
-        Self::from(atom)
+        self.into()
     }
 }
 
@@ -83,16 +142,8 @@ impl std::ops::Deref for Literal {
 impl std::fmt::Debug for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Pos(str) => write!(f, "+{str:?}"),
-            Literal::Neg(str) => write!(f, "-{str:?}"),
+            Literal::Pos(inner) => write!(f, "+{inner:?}"),
+            Literal::Neg(inner) => write!(f, "-{inner:?}"),
         }
     }
 }
-
-// impl std::ops::Deref for RawLiteral {
-//     type Target = String;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }

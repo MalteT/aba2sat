@@ -87,7 +87,8 @@ fn simple_admissible_example() {
     for elem in aba.forward_sets(expected.clone()).unwrap() {
         assert!(
             result.contains(&elem),
-            "{elem:?} was expected but not found in result"
+            "{:?} was expected but not found in result",
+            aba.backward_set(elem).unwrap()
         );
     }
     for elem in aba.backward_sets(result).unwrap() {
@@ -117,7 +118,8 @@ fn simple_admissible_example_with_defense() {
     for elem in aba.forward_sets(expected.clone()).unwrap() {
         assert!(
             result.contains(&elem),
-            "{elem:?} was expected but not found in result"
+            "{:?} was expected but not found in result",
+            aba.backward_set(elem).unwrap()
         );
     }
     for elem in aba.backward_sets(result).unwrap() {
@@ -146,7 +148,8 @@ fn simple_admissible_atomic() {
     for elem in aba.forward_sets(expected.clone()).unwrap() {
         assert!(
             result.contains(&elem),
-            "{elem:?} was expected but not found in result"
+            "{:?} was expected but not found in result",
+            aba.backward_set(elem).unwrap()
         );
     }
     for elem in aba.backward_sets(result).unwrap() {

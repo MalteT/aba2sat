@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{prepared::PreparedAba, Aba, Num, Theory},
+    aba::{prepared::PreparedAba, Aba, Num},
     clauses::{Clause, ClauseList},
     error::Error,
-    literal::{IntoLiteral, TheoryAtom},
+    literal::{lits::Theory, IntoLiteral},
     Result,
 };
 
@@ -21,7 +21,7 @@ impl Problem for ConflictFreeness {
         let mut clauses = vec![];
         // Make sure that every assumption in our problem is inferred and every other not
         for assumption in aba.assumptions() {
-            let theory = Theory::new(*assumption);
+            let theory = Theory::from(*assumption);
             if self.assumptions.contains(assumption) {
                 clauses.push(vec![theory.pos()].into())
             } else {
@@ -30,8 +30,8 @@ impl Problem for ConflictFreeness {
         }
         for (assumption, inverse) in &aba.inverses {
             clauses.push(Clause::from(vec![
-                Theory::new(*assumption).neg(),
-                Theory::new(*inverse).neg(),
+                Theory::from(*assumption).neg(),
+                Theory::from(*inverse).neg(),
             ]));
         }
         clauses

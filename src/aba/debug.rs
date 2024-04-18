@@ -41,9 +41,19 @@ impl DebugAba {
         self.forward_map.get(&atom).cloned()
     }
 
+    pub fn backward_atom(&self, atom: Num) -> Option<char> {
+        self.backward_map.get(&atom).cloned()
+    }
+
     pub fn forward_set(&self, set: HashSet<char>) -> Option<HashSet<Num>> {
         set.into_iter()
             .map(|atom| self.forward_atom(atom))
+            .collect()
+    }
+
+    pub fn backward_set(&self, set: HashSet<Num>) -> Option<HashSet<char>> {
+        set.into_iter()
+            .map(|atom| self.backward_atom(atom))
             .collect()
     }
 

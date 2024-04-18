@@ -2,14 +2,17 @@
 use std::collections::HashSet;
 
 use crate::{
-    aba::{prepared::PreparedAba, Aba, Num, Theory},
+    aba::{prepared::PreparedAba, Aba, Num},
     clauses::{Clause, ClauseList},
     error::Error,
-    literal::{IntoLiteral, TheoryAtom},
+    literal::{
+        lits::{Theory, TheorySet, TheorySetHelper, TheorySetRuleBodyActive},
+        IntoLiteral,
+    },
     Result,
 };
 
-use super::{LoopControl, MultishotProblem, Problem, SetTheory, SolverState};
+use super::{LoopControl, MultishotProblem, Problem, SolverState};
 
 /// Compute all admissible extensions for an [`Aba`]
 #[derive(Default, Debug)]
@@ -32,38 +35,37 @@ pub struct DecideCredulousAdmissibility {
     pub element: Num,
 }
 
-pub fn initial_admissibility_clauses<I: std::fmt::Debug + 'static + TheoryAtom>(
-    aba: &PreparedAba,
-) -> ClauseList {
+pub fn initial_admissibility_clauses(aba: &PreparedAba) -> ClauseList {
     let mut clauses = vec![];
     // Create inference for the problem set
-    aba.derive_clauses::<I>().collect_into(&mut clauses);
+    aba.derive_clauses::<TheorySet, TheorySetHelper, TheorySetRuleBodyActive>()
+        .collect_into(&mut clauses);
     // Attack the inference of the aba, if an attack exists
     for (assumption, inverse) in &aba.inverses {
         [
             // For any assumption `a` and it's inverse `b`:
             //   a in th(A) <=> b not in th(S)
             Clause::from(vec![
-                Theory::new(*assumption).pos(),
-                SetTheory::new(*inverse).pos(),
+                Theory::from(*assumption).pos(),
+                TheorySet::from(*inverse).pos(),
             ]),
             Clause::from(vec![
-                Theory::new(*assumption).neg(),
-                SetTheory::new(*inverse).neg(),
+                Theory::from(*assumption).neg(),
+                TheorySet::from(*inverse).neg(),
             ]),
             // Prevent attacks from the opponent to the selected set
             // For any assumption `a` and it's inverse `b`:
             //   b in th(A) and a in th(S) => bottom
             Clause::from(vec![
-                Theory::new(*inverse).neg(),
-                SetTheory::new(*assumption).neg(),
+                Theory::from(*inverse).neg(),
+                TheorySet::from(*assumption).neg(),
             ]),
             // Prevent self-attacks
             // For any assumption `a` and it's inverse `b`:
             //   a in th(S) and b in th(S) => bottom
             Clause::from(vec![
-                SetTheory::new(*assumption).neg(),
-                SetTheory::new(*inverse).neg(),
+                TheorySet::from(*assumption).neg(),
+                TheorySet::from(*inverse).neg(),
             ]),
         ]
         .into_iter()
@@ -77,7 +79,7 @@ fn construct_found_set(state: SolverState<'_>) -> HashSet<Num> {
         .aba
         .assumptions()
         .filter_map(|assumption| {
-            let literal = SetTheory::new(*assumption).pos();
+            let literal = TheorySet::from(*assumption).pos();
             let raw = state.map.get_raw(&literal)?;
             match state.solver.value(raw) {
                 Some(true) => Some(*assumption),
@@ -91,12 +93,12 @@ impl Problem for SampleAdmissibleExtension {
     type Output = HashSet<Num>;
 
     fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
-        let mut clauses = initial_admissibility_clauses::<SetTheory>(aba);
+        let mut clauses = initial_admissibility_clauses(aba);
         // Prevent the empty set
         let no_empty_set: Clause = aba
             .inverses
             .keys()
-            .map(|assumption| SetTheory::new(*assumption).pos())
+            .map(|assumption| TheorySet::from(*assumption).pos())
             .collect();
         clauses.push(no_empty_set);
         clauses
@@ -117,12 +119,12 @@ impl MultishotProblem for EnumerateAdmissibleExtensions {
     fn additional_clauses(&self, aba: &PreparedAba, iteration: usize) -> ClauseList {
         match iteration {
             0 => {
-                let mut clauses = initial_admissibility_clauses::<SetTheory>(aba);
+                let mut clauses = initial_admissibility_clauses(aba);
                 // Prevent the empty set
                 let no_empty_set: Clause = aba
                     .inverses
                     .keys()
-                    .map(|assumption| SetTheory::new(*assumption).pos())
+                    .map(|assumption| TheorySet::from(*assumption).pos())
                     .collect();
                 clauses.push(no_empty_set);
                 clauses
@@ -136,9 +138,9 @@ impl MultishotProblem for EnumerateAdmissibleExtensions {
                     .assumptions()
                     .map(|assumption| {
                         if just_found.contains(assumption) {
-                            SetTheory::new(*assumption).neg()
+                            TheorySet::from(*assumption).neg()
                         } else {
-                            SetTheory::new(*assumption).pos()
+                            TheorySet::from(*assumption).pos()
                         }
                     })
                     .collect();
@@ -157,7 +159,7 @@ impl MultishotProblem for EnumerateAdmissibleExtensions {
             .inverses
             .keys()
             .filter_map(|assumption| {
-                let literal = SetTheory::new(*assumption).pos();
+                let literal = TheorySet::from(*assumption).pos();
                 let raw = state.map.get_raw(&literal)?;
                 match state.solver.value(raw) {
                     Some(true) => Some(*assumption),
@@ -187,10 +189,10 @@ impl Problem for VerifyAdmissibleExtension {
     type Output = bool;
 
     fn additional_clauses(&self, aba: &PreparedAba) -> crate::clauses::ClauseList {
-        let mut clauses = initial_admissibility_clauses::<SetTheory>(aba);
+        let mut clauses = initial_admissibility_clauses(aba);
         // Force inference on all members of the set
         for assumption in aba.assumptions() {
-            let inf = SetTheory::new(*assumption);
+            let inf = TheorySet::from(*assumption);
             if self.assumptions.contains(assumption) {
                 clauses.push(Clause::from(vec![inf.pos()]))
             } else {
@@ -223,8 +225,8 @@ impl Problem for DecideCredulousAdmissibility {
     type Output = bool;
 
     fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
-        let mut clauses = initial_admissibility_clauses::<SetTheory>(aba);
-        clauses.push(Clause::from(vec![SetTheory(self.element).pos()]));
+        let mut clauses = initial_admissibility_clauses(aba);
+        clauses.push(Clause::from(vec![TheorySet::from(self.element).pos()]));
         clauses
     }
 
