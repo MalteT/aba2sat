@@ -198,6 +198,7 @@
             pkgs.shellcheck
             pkgs.shfmt
             pkgs.nodejs
+            pkgs.hyperfine
             self'.packages.aspforaba
           ];
         };

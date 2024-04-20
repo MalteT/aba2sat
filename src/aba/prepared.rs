@@ -219,7 +219,6 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
             std::ops::ControlFlow::Continue(())
         }
     });
-    eprintln!("{}", loops.len());
     loops
 }
 
