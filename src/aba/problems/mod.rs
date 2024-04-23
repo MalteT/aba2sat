@@ -49,8 +49,8 @@ pub trait MultishotProblem {
     }
 }
 
-pub fn solve<P: Problem>(problem: P, aba: Aba) -> Result<P::Output> {
-    let aba = aba.prepare();
+pub fn solve<P: Problem>(problem: P, aba: Aba, max_loops: Option<usize>) -> Result<P::Output> {
+    let aba = aba.prepare(max_loops);
     // Let the problem perform additional checks before starting the solver
     problem.check(&aba)?;
     // Create a map that will keep track of the translation between
@@ -89,8 +89,12 @@ pub fn solve<P: Problem>(problem: P, aba: Aba) -> Result<P::Output> {
     }
 }
 
-pub fn multishot_solve<P: MultishotProblem>(mut problem: P, aba: Aba) -> Result<P::Output> {
-    let aba = aba.prepare();
+pub fn multishot_solve<P: MultishotProblem>(
+    mut problem: P,
+    aba: Aba,
+    max_loops: Option<usize>,
+) -> Result<P::Output> {
+    let aba = aba.prepare(max_loops);
     // Let the problem perform additional checks before starting the solver
     problem.check(&aba)?;
     // Create a map that will keep track of the translation between

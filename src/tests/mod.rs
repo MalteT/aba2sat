@@ -43,6 +43,7 @@ fn simple_conflict_free_verification() {
                     assumptions: translated,
                 },
                 aba.aba().clone(),
+                None
             )
             .unwrap();
             assert!(
@@ -67,7 +68,7 @@ fn simple_admissible_verification() {
             eprintln!("Checking set {assumptions:?}");
             let translated= aba.forward_set(assumptions.clone()).unwrap();
             let result =
-                crate::aba::problems::solve(VerifyAdmissibleExtension { assumptions: translated }, aba.aba().clone()).unwrap();
+                crate::aba::problems::solve(VerifyAdmissibleExtension { assumptions: translated }, aba.aba().clone(), None).unwrap();
             assert!(
                 result == expectation,
                 "Expected {expectation} from solver, but got {result} while checking {assumptions:?}"
@@ -82,6 +83,7 @@ fn simple_admissible_example() {
     let result = crate::aba::problems::multishot_solve(
         EnumerateAdmissibleExtensions::default(),
         aba.aba().clone(),
+        None,
     )
     .unwrap();
     for elem in aba.forward_sets(expected.clone()).unwrap() {
@@ -113,6 +115,7 @@ fn simple_admissible_example_with_defense() {
     let result = crate::aba::problems::multishot_solve(
         EnumerateAdmissibleExtensions::default(),
         aba.aba().clone(),
+        None,
     )
     .unwrap();
     for elem in aba.forward_sets(expected.clone()).unwrap() {
@@ -143,6 +146,7 @@ fn simple_admissible_atomic() {
     let result = crate::aba::problems::multishot_solve(
         EnumerateAdmissibleExtensions::default(),
         aba.aba().clone(),
+        None,
     )
     .unwrap();
     for elem in aba.forward_sets(expected.clone()).unwrap() {
@@ -173,6 +177,7 @@ fn a_chain_with_no_beginning() {
     let result = crate::aba::problems::multishot_solve(
         EnumerateAdmissibleExtensions::default(),
         aba.aba().clone(),
+        None,
     )
     .unwrap();
     for elem in aba.forward_sets(expected.clone()).unwrap() {
@@ -199,7 +204,7 @@ fn loops_and_conflicts() {
         .with_rule('d', ['b']);
     let element = aba.forward_atom('d').unwrap();
     let result =
-        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone())
+        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone(), None)
             .unwrap();
     assert!(!result, "d cannot be credulous complete");
 }
@@ -214,7 +219,7 @@ fn loops_and_conflicts_2() {
         .with_rule('d', ['a']);
     let element = aba.forward_atom('b').unwrap();
     let result =
-        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone())
+        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone(), None)
             .unwrap();
     assert!(result, "b is credulous complete");
 }

@@ -4,37 +4,25 @@
 
 use std::{collections::HashSet, fmt::Write as WriteFmt, fs::read_to_string, io::Write as WriteIo};
 
-use aba::{
-    problems::{
-        admissibility::{
-            DecideCredulousAdmissibility, EnumerateAdmissibleExtensions, SampleAdmissibleExtension,
-            VerifyAdmissibleExtension,
+use aba2sat::{
+    aba::{
+        self,
+        problems::{
+            admissibility::{
+                DecideCredulousAdmissibility, EnumerateAdmissibleExtensions,
+                SampleAdmissibleExtension, VerifyAdmissibleExtension,
+            },
+            complete::{DecideCredulousComplete, EnumerateCompleteExtensions},
         },
-        complete::{DecideCredulousComplete, EnumerateCompleteExtensions},
+        Num,
     },
-    Num,
+    Error,
 };
+use aba2sat::{parser, Result};
 use args::ARGS;
 use clap::Parser;
 
-use crate::error::{Error, Result};
-
-#[cfg(test)]
-macro_rules! set {
-    ($($elem:expr),*) => {{
-        vec![$($elem),*].into_iter().collect()
-    }}
-}
-
-mod aba;
 mod args;
-mod clauses;
-mod error;
-mod literal;
-mod mapper;
-mod parser;
-#[cfg(test)]
-mod tests;
 
 trait IccmaFormattable {
     fn fmt_iccma(&self) -> Result<String>;
@@ -56,24 +44,36 @@ fn __main() -> Result {
                 assumptions: set.iter().cloned().collect(),
             },
             aba,
+            args.max_loops,
         )?
         .fmt_iccma(),
-        args::Problems::EnumerateAdmissibility => {
-            aba::problems::multishot_solve(EnumerateAdmissibleExtensions::default(), aba)?
-                .fmt_iccma()
-        }
+        args::Problems::EnumerateAdmissibility => aba::problems::multishot_solve(
+            EnumerateAdmissibleExtensions::default(),
+            aba,
+            args.max_loops,
+        )?
+        .fmt_iccma(),
         args::Problems::SampleAdmissibility => {
-            aba::problems::solve(SampleAdmissibleExtension, aba)?.fmt_iccma()
+            aba::problems::solve(SampleAdmissibleExtension, aba, args.max_loops)?.fmt_iccma()
         }
-        args::Problems::DecideCredulousAdmissibility { query } => {
-            aba::problems::solve(DecideCredulousAdmissibility { element: *query }, aba)?.fmt_iccma()
-        }
-        args::Problems::EnumerateComplete => {
-            aba::problems::multishot_solve(EnumerateCompleteExtensions::default(), aba)?.fmt_iccma()
-        }
-        args::Problems::DecideCredulousComplete { query } => {
-            aba::problems::solve(DecideCredulousComplete { element: *query }, aba)?.fmt_iccma()
-        }
+        args::Problems::DecideCredulousAdmissibility { query } => aba::problems::solve(
+            DecideCredulousAdmissibility { element: *query },
+            aba,
+            args.max_loops,
+        )?
+        .fmt_iccma(),
+        args::Problems::EnumerateComplete => aba::problems::multishot_solve(
+            EnumerateCompleteExtensions::default(),
+            aba,
+            args.max_loops,
+        )?
+        .fmt_iccma(),
+        args::Problems::DecideCredulousComplete { query } => aba::problems::solve(
+            DecideCredulousComplete { element: *query },
+            aba,
+            args.max_loops,
+        )?
+        .fmt_iccma(),
     }?;
     let mut stdout = std::io::stdout().lock();
     match writeln!(stdout, "{}", result) {

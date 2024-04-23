@@ -19,8 +19,10 @@
 //!
 //!
 //! // Solve the problem whether the set of assumptions {'b'} is admissible
+//! let atom = aba.forward_atom('b').unwrap();
+//! let assumptions = vec![atom].into_iter().collect();
 //! let result =
-//!     solve(VerifyAdmissibleExtension { assumptions: vec!['b'] }, &aba).unwrap();
+//!     solve(VerifyAdmissibleExtension { assumptions }, aba.aba().clone(), None).unwrap();
 //!
 //! // The result should be true
 //! assert!(result)
@@ -42,8 +44,8 @@ pub type Num = u32;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Aba {
-    rules: RuleList,
-    inverses: HashMap<Num, Num>,
+    pub rules: RuleList,
+    pub inverses: HashMap<Num, Num>,
 }
 
 impl Aba {
@@ -97,8 +99,8 @@ impl Aba {
     }
 
     /// Prepare this aba for translation to SAT
-    pub fn prepare(self) -> PreparedAba {
-        PreparedAba::from(self)
+    pub fn prepare(self, max_loops: Option<usize>) -> PreparedAba {
+        PreparedAba::new(self, max_loops)
     }
 
     fn rule_heads(&self) -> impl Iterator<Item = &Num> + '_ {

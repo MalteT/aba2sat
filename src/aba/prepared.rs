@@ -5,7 +5,6 @@ use iter_tools::Itertools;
 
 use crate::{
     aba::Num,
-    args::ARGS,
     clauses::Clause,
     literal::{
         lits::{LoopHelper, TheoryRuleBodyActive},
@@ -28,6 +27,12 @@ pub struct PreparedAba {
 }
 
 impl PreparedAba {
+    /// Create a new [`PreparedAba`] from a raw [`Aba`]
+    pub fn new(mut aba: Aba, max_loops: Option<usize>) -> Self {
+        trim_unreachable_rules(&mut aba);
+        let loops = calculate_loops_and_their_support(&aba, max_loops);
+        PreparedAba { aba, loops }
+    }
     /// Translate the ABA into base rules / definitions for SAT solving
     pub fn derive_clauses<Ctx: Context>(&self) -> impl Iterator<Item = Clause> + '_ {
         theory_helper::<Ctx>(self)
@@ -55,7 +60,7 @@ impl PreparedAba {
     /// ```
     /// where body(h <- B) = B and and({a1, ..., ax}) = a1 and ... and ax.
     ///
-    /// This will lead to an exponential explosion when converted to naively CNF,
+    /// This will lead to an exponential explosion when converted to CNF naively,
     /// since the formulas are mostly DNF. We use Tseitin's transformation to prevent this:
     /// ```text
     ///    LH_i <=> RBA_1 or ... or RBA_n
@@ -162,7 +167,7 @@ fn trim_unreachable_rules(aba: &mut Aba) {
     });
 }
 
-fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
+fn calculate_loops_and_their_support(aba: &Aba, max_loops: Option<usize>) -> Vec<r#Loop> {
     let mut graph = petgraph::graph::DiGraph::<Num, ()>::new();
     let universe = aba
         .universe()
@@ -189,7 +194,7 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
     }
     let mut loops = vec![];
     const LOOP_SIZE_IN_MULT_UNIVERSE_SIZE: f32 = 1.0;
-    let max_loops = if let Some(max) = ARGS.as_ref().and_then(|args| args.max_loops) {
+    let max_loops = if let Some(max) = max_loops {
         max
     } else {
         (universe.len() as f32 * LOOP_SIZE_IN_MULT_UNIVERSE_SIZE) as usize
@@ -220,14 +225,6 @@ fn calculate_loops_and_their_support(aba: &Aba) -> Vec<r#Loop> {
         }
     });
     loops
-}
-
-impl From<Aba> for PreparedAba {
-    fn from(mut aba: Aba) -> Self {
-        trim_unreachable_rules(&mut aba);
-        let loops = calculate_loops_and_their_support(&aba);
-        PreparedAba { aba, loops }
-    }
 }
 
 impl std::ops::Deref for PreparedAba {
