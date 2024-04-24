@@ -166,42 +166,41 @@
               partitions = 1;
               partitionType = "count";
             });
-        };
-
-        packages =
-          {
-            default = aba2sat;
-            aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix {inherit (self'.packages) clingo;};
-            clingo = pkgs.callPackage ./nix/packages/clingo.nix {};
-          }
-          // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-            aba2sat-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs
-              // {
-                inherit cargoArtifacts;
-              });
           };
 
-        apps.default = flake-utils.lib.mkApp {
-          drv = aba2sat;
-        };
+          packages = {
+            default = aba2sat;
+            aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix { inherit (self'.packages) clingo; };
+            clingo = pkgs.callPackage ./nix/packages/clingo.nix { };
+          } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+            aba2sat-llvm-coverage = craneLibLLvmTools.cargoLlvmCov (commonArgs // {
+              inherit cargoArtifacts;
+            });
+          };
 
-        devShells.default = craneLib.devShell {
-          # Inherit inputs from checks.
-          checks = self.checks.${system};
+          apps.default = flake-utils.lib.mkApp {
+            drv = aba2sat;
+          };
 
-          RUST_LOG = "trace";
+          devShells.default = craneLib.devShell {
+            # Inherit inputs from checks.
+            checks = self.checks.${system};
 
-          # Extra inputs can be added here; cargo and rustc are provided by default.
-          packages = [
-            pkgs.nil
-            pkgs.pre-commit
-            pkgs.shellcheck
-            pkgs.shfmt
-            pkgs.nodejs
-            pkgs.hyperfine
-            self'.packages.aspforaba
-          ];
+            RUST_LOG = "trace";
+
+            inputsFrom = [ ];
+
+            packages = [
+              pkgs.hyperfine
+              pkgs.lldb
+              pkgs.nil
+              pkgs.nodejs
+              pkgs.pre-commit
+              pkgs.shellcheck
+              pkgs.shfmt
+              self'.packages.aspforaba
+            ];
+          };
         };
       };
-    };
 }
