@@ -15,6 +15,8 @@ print_help_and_exit() {
   printf "          The additional argument for the problem\n"
   printf "  -f, --file\n"
   printf "          The file containing the problem in ABA format\n"
+  printf "  -t, --time\n"
+  printf "          Execute hyperfine to determine runtimes\n"
   printf "  --files-from\n"
   printf "          Use the following dir to read files, specify a single file with --file instead\n"
   exit 1
@@ -41,22 +43,29 @@ run_dc_co() {
     print_help_and_exit "Parameter --file is missing!"
   fi
   printf "===== %s ==== " "$(basename "$ABA_FILE")"
-  our_result=$("$ABA2SAT" --file "$ABA_FILE" dc-co --query "$ADDITIONAL_ARG" | tee "$OUTPUT_DIR/$(basename "$ABA_FILE")-aba2sat-result")
+  our_result=$("$ABA2SAT" --max-loops 0 --file "$ABA_FILE" dc-co --query "$ADDITIONAL_ARG" | tee "$OUTPUT_DIR/$(basename "$ABA_FILE")-aba2sat-result")
   other_result=$("$ASPFORABA" --file "$ABA_FILE" --problem DC-CO --query "$ADDITIONAL_ARG" | tee "$OUTPUT_DIR/$(basename "$ABA_FILE")-aspforaba-result")
-  $HYPERFINE --shell=none \
-    --export-json "$JSON_FILE" \
-    --command-name "aba2sat" \
-    "$ABA2SAT --file \"$ABA_FILE\" dc-co --query \"$ADDITIONAL_ARG\"" \
-    --command-name "aspforaba" \
-    "$ASPFORABA --file \"$ABA_FILE\" --problem DC-CO --query \"$ADDITIONAL_ARG\"" 1>/dev/null 2>&1
   if [ "$our_result" != "$other_result" ]; then
     printf "❌\n"
   else
     printf "✅\n"
   fi
   printf "Argument: %s\n" "$ADDITIONAL_ARG"
-  printf "Our:      %3s %30s\n" "$our_result" "$(format_time "aba2sat" "$JSON_FILE")"
-  printf "Their:    %3s %30s\n" "$other_result" "$(format_time "aspforaba" "$JSON_FILE")"
+
+  if [ -n "$TIME_COMMANDS" ]; then
+    $HYPERFINE --shell=none \
+      --export-json "$JSON_FILE" \
+      --command-name "aba2sat" \
+      "$ABA2SAT --max-loops 0 --file \"$ABA_FILE\" dc-co --query \"$ADDITIONAL_ARG\"" \
+      --command-name "aspforaba" \
+      "$ASPFORABA --file \"$ABA_FILE\" --problem DC-CO --query \"$ADDITIONAL_ARG\"" 1>/dev/null 2>&1
+    printf "Our:      %3s %30s\n" "$our_result" "$(format_time "aba2sat" "$JSON_FILE")"
+    printf "Their:    %3s %30s\n" "$other_result" "$(format_time "aspforaba" "$JSON_FILE")"
+  else
+    printf "Our:      %3s\n" "$our_result"
+    printf "Their:    %3s\n" "$other_result"
+  fi
+
 }
 
 POSITIONAL_ARGS=()
@@ -68,6 +77,7 @@ ABA_FILE_EXT=aba
 HYPERFINE=hyperfine
 PROBLEM=
 ADDITIONAL_ARG=
+TIME_COMMANDS=
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -110,6 +120,10 @@ while [[ $# -gt 0 ]]; do
     shift
     ADDITIONAL_ARG=$1
     shift
+    ;;
+  -t | --time)
+    shift
+    TIME_COMMANDS=yes
     ;;
   --aba2sat)
     shift

@@ -1,10 +1,5 @@
-use aba2sat::{
-    aba::{Aba, Num},
-    parser,
-};
-use graph_cycles::Cycles;
-use iter_tools::Itertools;
-use std::{collections::BTreeMap, path::PathBuf};
+use aba2sat::{aba::Aba, parser};
+use std::path::PathBuf;
 
 use clap::{command, Parser};
 
@@ -40,49 +35,9 @@ pub enum Error {
 }
 
 fn count_loops(aba: &Aba, max_loops: Option<usize>) -> usize {
-    let mut graph = petgraph::graph::DiGraph::<Num, ()>::new();
-    let universe = aba
-        .universe()
-        .unique()
-        .scan(&mut graph, |graph, element| {
-            let idx = graph.add_node(*element);
-            Some((*element, idx))
-        })
-        .collect::<BTreeMap<_, _>>();
-    aba.rules
-        .iter()
-        .flat_map(|(head, body)| body.iter().map(|body_element| (*body_element, *head)))
-        .for_each(|(from, to)| {
-            let from = universe.get(&from).unwrap();
-            let to = universe.get(&to).unwrap();
-            graph.update_edge(*from, *to, ());
-        });
-    let mut loops = 0;
-    let max_loops = if let Some(max) = max_loops {
-        max
-    } else {
-        usize::MAX
-    };
-    let mut output_printed = false;
-    graph.visit_cycles(|_graph, _cycle| {
-        loops += 1;
-        if loops % 100_000 == 0 {
-            eprintln!("{loops}");
-        }
-        if loops >= max_loops {
-            if !output_printed {
-                eprintln!(
-                    "Too... many... cycles... Aborting cycle detection with {} cycles.",
-                    loops
-                );
-                output_printed = true;
-            }
-            std::ops::ControlFlow::Break(())
-        } else {
-            std::ops::ControlFlow::Continue(())
-        }
-    });
-    loops
+    aba2sat::aba::loops_of(aba)
+        .take(max_loops.unwrap_or(usize::MAX))
+        .count()
 }
 
 fn __main() -> Result<(), Error> {
@@ -113,6 +68,7 @@ mod tests {
     pub fn one_loop() {
         let aba = DebugAba::default()
             .with_assumption('a', 'c')
+            .with_rule('b', ['a'])
             .with_rule('b', ['c'])
             .with_rule('c', ['b']);
         assert_eq!(count_loops(aba.aba(), None), 1);

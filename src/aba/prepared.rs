@@ -1,10 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
-
-use graph_cycles::Cycles;
-use iter_tools::Itertools;
+use std::collections::HashSet;
 
 use crate::{
-    aba::Num,
+    aba::{traverse::loops_of, Num},
     clauses::Clause,
     literal::{
         lits::{LoopHelper, TheoryRuleBodyActive},
@@ -15,7 +12,7 @@ use crate::{
 use super::{theory::theory_helper, Aba, Context};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct r#Loop {
+struct Loop {
     heads: HashSet<Num>,
     support: Vec<usize>,
 }
@@ -23,14 +20,14 @@ struct r#Loop {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedAba {
     aba: Aba,
-    loops: Vec<r#Loop>,
+    loops: Vec<Loop>,
 }
 
 impl PreparedAba {
     /// Create a new [`PreparedAba`] from a raw [`Aba`]
     pub fn new(mut aba: Aba, max_loops: Option<usize>) -> Self {
         trim_unreachable_rules(&mut aba);
-        let loops = calculate_loops_and_their_support(&aba, max_loops);
+        let loops = calculate_loops_and_their_support(&aba, max_loops).collect();
         PreparedAba { aba, loops }
     }
     /// Translate the ABA into base rules / definitions for SAT solving
@@ -167,64 +164,31 @@ fn trim_unreachable_rules(aba: &mut Aba) {
     });
 }
 
-fn calculate_loops_and_their_support(aba: &Aba, max_loops: Option<usize>) -> Vec<r#Loop> {
-    let mut graph = petgraph::graph::DiGraph::<Num, ()>::new();
-    let universe = aba
-        .universe()
-        .unique()
-        .scan(&mut graph, |graph, element| {
-            let idx = graph.add_node(*element);
-            Some((*element, idx))
-        })
-        .collect::<BTreeMap<_, _>>();
-    aba.rules
-        .iter()
-        .flat_map(|(head, body)| body.iter().map(|body_element| (*body_element, *head)))
-        .for_each(|(from, to)| {
-            let from = universe.get(&from).unwrap();
-            let to = universe.get(&to).unwrap();
-            graph.update_edge(*from, *to, ());
-        });
-    #[cfg(debug_assertions)]
-    {
-        use std::{fs::File, io::Write};
-        let mut file = File::create("./graph.gv").unwrap();
-        let dot = petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
-        write!(file, "{dot:?}").unwrap();
-    }
-    let mut loops = vec![];
-    const LOOP_SIZE_IN_MULT_UNIVERSE_SIZE: f32 = 1.0;
-    let max_loops = if let Some(max) = max_loops {
-        max
-    } else {
-        (universe.len() as f32 * LOOP_SIZE_IN_MULT_UNIVERSE_SIZE) as usize
-    };
-    let mut output_printed = false;
-    graph.visit_cycles(|graph, cycle| {
-        let heads = cycle.iter().map(|idx| graph[*idx]).collect::<HashSet<_>>();
-        let loop_rules = aba
+fn calculate_loops_and_their_support(
+    aba: &Aba,
+    max_loops: Option<usize>,
+) -> impl Iterator<Item = Loop> + '_ {
+    let max_loops = max_loops.unwrap_or_else(|| aba.universe().collect::<HashSet<_>>().len());
+    loops_of(aba).enumerate().map_while(move |(idx, l)| {
+        if idx >= max_loops {
+            eprintln!("Too many loops! {max_loops}");
+            return None;
+        }
+        // Relevant rules are those that contain only elements from outside the loop
+        // All other rules cannot influence the value of the loop
+        let support = aba
             .rules
             .iter()
             .enumerate()
-            .filter(|(_rule_id, (head, _body))| heads.contains(head));
-        // Relevant rules are those that contain only elements from outside the loop
-        // All other rules cannot influence the value of the loop
-        let support = loop_rules
-            .filter(|(_rule_id, (_head, body))| body.is_disjoint(&heads))
+            .filter(|(_rule_id, (head, _body))| l.heads.contains(head))
+            .filter(|(_rule_id, (_head, body))| body.is_disjoint(&l.heads))
             .map(|(rule_id, _)| rule_id)
             .collect();
-        loops.push(r#Loop { heads, support });
-        if loops.len() >= max_loops {
-            if ! output_printed {
-                eprintln!("Too... many... cycles... Aborting cycle detection with {} cycles. Solver? You're on your own now", loops.len());
-                output_printed = true;
-            }
-            std::ops::ControlFlow::Break(())
-        } else {
-            std::ops::ControlFlow::Continue(())
-        }
-    });
-    loops
+        Some(Loop {
+            heads: l.heads,
+            support,
+        })
+    })
 }
 
 impl std::ops::Deref for PreparedAba {

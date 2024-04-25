@@ -31,12 +31,14 @@ use std::collections::{HashMap, HashSet};
 
 use crate::literal::RawLiteral;
 
-use self::prepared::PreparedAba;
-
 pub mod debug;
 mod prepared;
 pub mod problems;
 mod theory;
+mod traverse;
+
+pub use prepared::PreparedAba;
+pub use traverse::{loops_of, Loop, Loops};
 
 pub type Rule = (Num, HashSet<Num>);
 pub type RuleList = Vec<Rule>;
