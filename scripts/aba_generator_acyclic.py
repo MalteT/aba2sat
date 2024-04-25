@@ -71,7 +71,6 @@ framework = create_framework(n_sentences, n_a, n_rph, n_spb, cycle_prob)
 print_ASP(framework[0], framework[2], framework[3], "generated_benchmark.asp", "s0")
 
 
-'''
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--directory')
 parser.add_argument('-i', '--identifier')

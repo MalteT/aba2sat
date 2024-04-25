@@ -58,15 +58,17 @@ fn count_loops(aba: &Aba, max_loops: Option<usize>) -> usize {
             graph.update_edge(*from, *to, ());
         });
     let mut loops = 0;
-    const LOOP_SIZE_IN_MULT_UNIVERSE_SIZE: f32 = 1.0;
     let max_loops = if let Some(max) = max_loops {
         max
     } else {
-        (universe.len() as f32 * LOOP_SIZE_IN_MULT_UNIVERSE_SIZE) as usize
+        usize::MAX
     };
     let mut output_printed = false;
     graph.visit_cycles(|_graph, _cycle| {
         loops += 1;
+        if loops % 100_000 == 0 {
+            eprintln!("{loops}");
+        }
         if loops >= max_loops {
             if !output_printed {
                 eprintln!(

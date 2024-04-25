@@ -19,8 +19,7 @@ OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import sys, random
-import argparse
+import random
 
 def create_framework(n_sentences, n_assumptions, n_rules_per_head, size_of_bodies):
     """
@@ -58,6 +57,7 @@ def print_ICCMA_format(assumptions, contraries, rules, n_sentences, out_filename
     Print the given framework in the ICCMA 2023 format.
     """
     offset = len(assumptions)
+
     with open(out_filename, 'w') as out:
         out.write(f"p aba {n_sentences}\n")
         for i, asm in enumerate(assumptions):
