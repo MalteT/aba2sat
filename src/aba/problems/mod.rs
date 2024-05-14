@@ -70,7 +70,7 @@ pub fn solve<P: Problem>(problem: P, aba: Aba, max_loops: Option<usize>) -> Resu
     map.as_raw_iter(&additional_clauses)
         .for_each(|raw| sat.add_clause(raw));
     // A single solver call to determine the solution
-    if let Some(sat_result) = sat.solve() {
+    if let Some(sat_result) = call_sat_solver(&mut sat) {
         #[cfg(debug_assertions)]
         if sat_result {
             let rec = map.reconstruct(&sat).collect::<Vec<_>>();
@@ -119,7 +119,7 @@ pub fn multishot_solve<P: MultishotProblem>(
         map.as_raw_iter(&additional_clauses)
             .for_each(|raw| sat.add_clause(raw));
         // Call the solver for the next result
-        let sat_result = sat.solve().ok_or(Error::SatCallInterrupted)?;
+        let sat_result = call_sat_solver(&mut sat).ok_or(Error::SatCallInterrupted)?;
         #[cfg(debug_assertions)]
         if sat_result {
             let rec = map.reconstruct(&sat).collect::<Vec<_>>();
@@ -153,4 +153,12 @@ pub fn multishot_solve<P: MultishotProblem>(
         },
         iteration,
     ))
+}
+
+#[cfg_attr(
+    feature = "timing",
+    fun_time::fun_time(message = "Calling SAT solver", reporting = "log")
+)]
+fn call_sat_solver(sat: &mut Solver) -> Option<bool> {
+    sat.solve()
 }

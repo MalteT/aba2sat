@@ -185,27 +185,31 @@
           drv = aba2sat;
         };
 
-        devShells.default = craneLib.devShell {
-          # Inherit inputs from checks.
-          checks = self.checks.${system};
+        devShells.default = let
+          python = pkgs.python3.withPackages (ps: [ps.torch ps.torchvision ps.psutil]);
+        in
+          craneLib.devShell {
+            # Inherit inputs from checks.
+            checks = self.checks.${system};
 
-          RUST_LOG = "trace";
+            RUST_LOG = "trace";
 
-          inputsFrom = [];
+            inputsFrom = [];
 
-          packages = [
-            pkgs.hyperfine
-            pkgs.lldb
-            pkgs.nil
-            pkgs.nodejs
-            pkgs.pre-commit
-            pkgs.pyright
-            pkgs.ruff-lsp
-            pkgs.shellcheck
-            pkgs.shfmt
-            self'.packages.aspforaba
-          ];
-        };
+            packages = [
+              pkgs.hyperfine
+              pkgs.lldb
+              pkgs.nil
+              pkgs.nodejs
+              pkgs.pre-commit
+              pkgs.pyright
+              pkgs.ruff-lsp
+              pkgs.shellcheck
+              pkgs.shfmt
+              python
+              self'.packages.aspforaba
+            ];
+          };
       };
     };
 }

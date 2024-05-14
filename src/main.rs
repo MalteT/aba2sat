@@ -29,6 +29,7 @@ trait IccmaFormattable {
 }
 
 fn __main() -> Result {
+    pretty_env_logger::init();
     let args = match &*ARGS {
         Some(args) => args,
         None => {

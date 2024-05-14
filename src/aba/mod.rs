@@ -101,6 +101,13 @@ impl Aba {
     }
 
     /// Prepare this aba for translation to SAT
+    #[cfg_attr(
+        feature = "timing",
+        fun_time::fun_time(
+            message = "Preparing ABA with max {max_loops:?} loops",
+            reporting = "log"
+        )
+    )]
     pub fn prepare(self, max_loops: Option<usize>) -> PreparedAba {
         PreparedAba::new(self, max_loops)
     }

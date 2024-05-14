@@ -2,3 +2,6 @@
 result*
 target/
 .pre-commit-config.yaml
+scripts/__pycache__
+acyclic
+output-*

@@ -27,7 +27,10 @@ impl PreparedAba {
     /// Create a new [`PreparedAba`] from a raw [`Aba`]
     pub fn new(mut aba: Aba, max_loops: Option<usize>) -> Self {
         trim_unreachable_rules(&mut aba);
-        let loops = calculate_loops_and_their_support(&aba, max_loops).collect();
+        let loops = match max_loops {
+            Some(0) => vec![],
+            _ => calculate_loops_and_their_support(&aba, max_loops).collect(),
+        };
         PreparedAba { aba, loops }
     }
     /// Translate the ABA into base rules / definitions for SAT solving
@@ -138,6 +141,10 @@ impl PreparedAba {
 /// Iterates over all rules, marking reachable elements until
 /// no additional rule can be applied. Then removes every
 /// rule that contains any unreachable atom and returns the rest
+#[cfg_attr(
+    feature = "timing",
+    fun_time::fun_time(message = "Triming unnecessary rules from ABA", reporting = "log")
+)]
 fn trim_unreachable_rules(aba: &mut Aba) {
     // Begin with all assumptions marked as reachable
     let mut reachable: HashSet<_> = aba.assumptions().cloned().collect();

@@ -1,9 +1,9 @@
+#!/usr/bin/env python3
+
 import random
 import argparse
-import sys
 
-def create_framework(n_sentences, n_assumptions, n_rules_per_head,
-    size_of_bodies, cycle_prob):
+def create_framework(n_sentences, n_assumptions, n_rules_per_head, size_of_bodies, cycle_prob):
     """
     Create a random framework.
 
@@ -15,8 +15,8 @@ def create_framework(n_sentences, n_assumptions, n_rules_per_head,
     - max(size_of_bodies) <= n_sentences+n_assumptions
     """
 
-    assumptions = ["a" + str(i) for i in range(n_assumptions)]
-    sentences = ["s" + str(i) for i in range(n_sentences-n_assumptions)]
+    assumptions = [str(i) for i in range(1,n_assumptions+1)]
+    sentences = [str(i) for i in range(n_assumptions+1,n_sentences+1)]
 
     contraries = {asmpt: random.choice(sentences+assumptions) for asmpt in assumptions}
 
@@ -42,56 +42,54 @@ def create_framework(n_sentences, n_assumptions, n_rules_per_head,
 
     return assumptions, sentences, contraries, rules
 
-def print_ASP(assumptions, contraries, rules, out_filename, query=None):
+def print_ICCMA_format(assumptions, contraries, rules, n_sentences, out_filename):
     """
-    Print the given framework in ASP format.
+    Print the given framework in the ICCMA 2023 format.
     """
+    offset = len(assumptions)
+
     with open(out_filename, 'w') as out:
-        for asm in assumptions:
-            out.write("assumption(" + asm + ").\n")
+        out.write(f"p aba {n_sentences}\n")
+        for i, asm in enumerate(assumptions):
+            out.write(f"a {asm}\n")
+            #print(f"a {asm}")
         for ctr in contraries:
-            out.write("contrary(" + ctr + "," + contraries.get(ctr) + ").\n")
-        for i, rule in enumerate(rules):
-            out.write("head(" + str(i) + "," + rule[0] + ").\n")
-            if rule[1]:
-                for body in rule[1]:
-                    out.write("body(" + str(i) + "," + body + ").\n")
-        if query:
-            out.write("query(" + query + ").")
+            out.write(f"c {ctr} {contraries.get(ctr)}\n")
+            #print(f"c {ctr} {contraries.get(ctr)}")
+        for rule in rules:
+            out.write(f"r {rule[0]} {' '.join(rule[1])}\n")
+            #print(f"r {rule[0]} {' '.join(rule[1])}")
 
-n_sentences = int(sys.argv[1])
-cycle_prob = float(sys.argv[2])
-max_rules_per_head = 5
-max_body_size = 5
-n_a = int(round(0.15*n_sentences))
-n_rph = range(1,max_rules_per_head+1)
-n_spb = range(1,max_body_size)
-
-framework = create_framework(n_sentences, n_a, n_rph, n_spb, cycle_prob)
-print_ASP(framework[0], framework[2], framework[3], "generated_benchmark.asp", "s0")
-
+def ICCMA23_benchmarks(sentences=[1000,2000,3000,4000,5000], max_rules_per_head_list=[5,10], max_rule_size_list=[5,10], assumption_ratios=[0.1,0.3], count=10, directory="iccma23_aba_benchmarks", identifier="aba"):
+    random.seed(811543731122527)
+    for sentence in sentences:
+        for assumption_ratio in assumption_ratios:
+            for max_rules_per_head in max_rules_per_head_list:
+                for max_rule_size in max_rule_size_list:
+                    for i in range(count):
+                        number_assumptions = int(round(assumption_ratio*sentence))
+                        number_rules_per_head = range(1,max_rules_per_head+1)
+                        n_spb = range(1,max_rule_size+1)
+                        filename = f"{directory}/{identifier}_{sentence}_{assumption_ratio}_{max_rules_per_head}_{max_rule_size}_{i}.aba"
+                        print(filename)
+                        framework = create_framework(sentence, number_assumptions, number_rules_per_head, n_spb, 0)
+                        query = random.randint(1,number_assumptions)
+                        with open(f"{filename}.asm", 'w') as out:
+                            print(f"{filename}.asm")
+                            out.write(f"{query}")
+                        print_ICCMA_format(framework[0], framework[2], framework[3], sentence, filename)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--directory')
 parser.add_argument('-i', '--identifier')
 args = parser.parse_args()
 
-directory = args.directory
-identifier = args.identifier
-
-sens = [1000,2000,3000,4000,5000]
-n_rules_max = [2,5,8,13]
-rule_size_max = [2,5,8,13]
-asmpt_ratio = [0.15,0.3,0.7]
-for sen in sens:
-    for k in asmpt_ratio:
-        for rph_max in n_rules_max:
-            for spb_max in rule_size_max:
-                for i in range(10):
-                    n_a = int(round(k*sen))
-                    n_rph = range(1,rph_max+1)
-                    n_spb = range(1,spb_max+1)
-                    filename = f"{directory}/{identifier}_{sen}_{k}_{rph_max}_{spb_max}_{i}.asp"
-                    print(filename)
-                    framework = create_framework(sen, n_a, n_rph, n_spb)
-                    print_ASP(framework[0], framework[2], framework[3], filename)
+ICCMA23_benchmarks(
+    sentences = [50,100,200,300,400,500,1000,2000],
+    max_rules_per_head_list = [1,2,4,8,16],
+    max_rule_size_list = [1,2,4,8,16],
+    assumption_ratios = [0.1,0.3,0.5,0.7,0.9],
+    count = 5,
+    directory=args.directory if args.directory is not None else "acyclic",
+    identifier=args.identifier if args.identifier is not None else "aba",
+)
