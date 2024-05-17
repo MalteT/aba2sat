@@ -186,7 +186,7 @@
         };
 
         devShells.default = let
-          python = pkgs.python3.withPackages (ps: [ps.torch ps.torchvision ps.psutil]);
+          python = pkgs.python3.withPackages (ps: [ps.torch ps.torchvision ps.psutil ps.pandas ps.matplotlib ps.seaborn]);
         in
           craneLib.devShell {
             # Inherit inputs from checks.
