@@ -85,7 +85,7 @@ parser.add_argument('-i', '--identifier')
 args = parser.parse_args()
 
 ICCMA23_benchmarks(
-    sentences = [50,100,200,300,400,500,1000,2000],
+    sentences = [50,100,200,300,400,500,1000,2000,5000],
     max_rules_per_head_list = [1,2,4,8,16],
     max_rule_size_list = [1,2,4,8,16],
     assumption_ratios = [0.1,0.3,0.5,0.7,0.9],
