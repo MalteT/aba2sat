@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Validate the correctness and optionally measure times of aba2sat and aspforaba
+# best used through the bundled nix version `nix run .#validate`
+
 print_help_and_exit() {
   if [ -n "$1" ]; then
     printf "%s\n\n" "$1"
@@ -70,7 +73,7 @@ run_dc_co() {
 
 POSITIONAL_ARGS=()
 ASPFORABA=ASPforABA
-ABA2SAT=result/bin/aba2sat
+ABA2SAT=aba2sat
 ABA_FILE=
 ABA_FILE_DIR=
 ABA_FILE_EXT=aba

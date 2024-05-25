@@ -168,10 +168,32 @@
             });
         };
 
-        packages =
+        packages = let
+          validate = pkgs.writeShellApplication {
+            name = "validate";
+            runtimeInputs = [
+              aba2sat
+              aspforaba
+              pkgs.coreutils
+              pkgs.hyperfine
+              pkgs.jq
+            ];
+            text = builtins.readFile ./scripts/validate.sh;
+          };
+
+          sc-batch = pkgs.writeShellApplication {
+            name = "sc-batch";
+            runtimeInputs = [
+              validate
+            ];
+            text = builtins.readFile ./scripts/sc-batch.sh;
+          };
+
+          aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix {inherit (self'.packages) clingo;};
+        in
           {
+            inherit validate aba2sat aspforaba sc-batch;
             default = aba2sat;
-            aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix {inherit (self'.packages) clingo;};
             clingo = pkgs.callPackage ./nix/packages/clingo.nix {};
           }
           // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
