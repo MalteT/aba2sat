@@ -11,18 +11,17 @@ FILE_LIST=acyclic.list
 # Pick line `$SLURM_ARRAY_TASK_ID` from the FILE_LIST
 # This will probably cause issues if more processes are allocated
 # than lines in the FILE_LIST, but who knows
-file="$(pwd)/$(awk "NR == $SLURM_ARRAY_TASK_ID" "$FILE_LIST")"
+file="$(awk "NR == $SLURM_ARRAY_TASK_ID" "$FILE_LIST")"
+basefile="$(basename "$file")"
 # Read the extra argument
-arg=$(cat "$file.asm")
+arg=$(cat "$(pwd)/$file.asm")
 
 # Make sure we get all the data in one central place
-OUTPUT_DIR="$(pwd)/output"
-export OUTPUT_DIR
+OUTPUT_DIR="output"
 
-# This assumes that `validate` accepts the --no-rm flag,
-# which is not a flag the script accepts, but recognized by
-# the default bundler `nix bundle .#validate` uses. Required here
-# to prevent the fastest process from cleaning the extracted
-# package. Slower processes or those allocated later *will* fail
-# without the flag
-./validate --no-rm // --file "$file" --arg "$arg" --time --problem dc-co
+singularity run \
+  --env OUTPUT_DIR=/out \
+  --bind "$(pwd)/acyclic:/in:ro" \
+  --bind "$(pwd)/$OUTPUT_DIR:/out" \
+  validate.sif \
+  validate --file "/in/$basefile" --arg "$arg" --time --problem dc-co
