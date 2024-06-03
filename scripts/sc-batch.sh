@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
+#SBATCH --time=4:00:00
+#SBATCH --mem=4G
 
 # Batch script to run on sc.uni-leipzig.de cluster, i used
-# sbatch -a "1-$(cat acyclic.list | wc -l)" ./scripts/sc-batch.sh
+# > sbatch -a "1-$(cat acyclic.list | wc -l)" ./scripts/sc-batch.sh
+
+# or
+
+# > sbatch -a "1-14999" --mail-type BEGIN,END,FAIL --output 'slurms/slurm-%A_%a.out' --job-name "ABA2SAT-$(date)" ./scripts/sc-batch.sh
+# for when there's more than 15k files..
 
 # Somehow all paths used in spawned processes need to be absolute,
 # there's probably a good explanation, but I don't have it
@@ -19,6 +26,14 @@ arg=$(cat "$(pwd)/$file.asm")
 # Make sure we get all the data in one central place
 OUTPUT_DIR="output"
 
+# Run singularity, this is basically docker
+# We mount /in and /out inside the container and use that to read and write
+
+# validate.sif is a converted format, easily done with
+# > singularity build validate.sif docker-archive://<your-docker-image.tar.gz>
+# The docker image was build using
+# > nix bundle .#validate --bundler github:NixOS/bundlers#toDockerImage
+# on my local machine to create an agnostic package that could run on the cluster
 singularity run \
   --env OUTPUT_DIR=/out \
   --bind "$(pwd)/acyclic:/in:ro" \
