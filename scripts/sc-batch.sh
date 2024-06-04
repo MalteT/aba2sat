@@ -8,17 +8,21 @@
 # or
 
 # > sbatch -a "1-14999" --mail-type BEGIN,END,FAIL --output 'slurms/slurm-%A_%a.out' --job-name "ABA2SAT-$(date)" ./scripts/sc-batch.sh
+# > sbatch -a "15000-22680" --mail-type BEGIN,END,FAIL --output 'slurms/slurm-%A_%a.out' --job-name "ABA2SAT-$(date)" ./scripts/sc-batch.sh
 # for when there's more than 15k files..
 
 # Somehow all paths used in spawned processes need to be absolute,
 # there's probably a good explanation, but I don't have it
 
 FILE_LIST=acyclic.list
+# Calculate the task index based on the SLURM array task ID and an optional offset.
+# The OFFSET variable is set to 0 if it is not already defined.
+NR="$(("${OFFSET:=0}" + "$SLURM_ARRAY_TASK_ID"))"
 
 # Pick line `$SLURM_ARRAY_TASK_ID` from the FILE_LIST
 # This will probably cause issues if more processes are allocated
 # than lines in the FILE_LIST, but who knows
-file="$(awk "NR == $SLURM_ARRAY_TASK_ID" "$FILE_LIST")"
+file="$(awk "NR == $NR" "$FILE_LIST")"
 basefile="$(basename "$file")"
 # Read the extra argument
 arg=$(cat "$(pwd)/$file.asm")
