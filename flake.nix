@@ -189,10 +189,20 @@
             text = builtins.readFile ./scripts/sc-batch.sh;
           };
 
+          decode-result-folder = pkgs.writeShellApplication {
+            name = "decode-result-folder";
+            runtimeInputs = [
+              pkgs.python3
+            ];
+            text = ''
+              python3 ${./scripts/decode-result-folder.py}
+            '';
+          };
+
           aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix {inherit (self'.packages) clingo;};
         in
           {
-            inherit validate aba2sat aspforaba sc-batch;
+            inherit validate aba2sat aspforaba sc-batch decode-result-folder;
             default = aba2sat;
             clingo = pkgs.callPackage ./nix/packages/clingo.nix {};
           }

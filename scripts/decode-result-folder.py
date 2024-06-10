@@ -47,7 +47,8 @@ def run():
                     "assumption_ratio": assumption_ratio,
                     "max_rules_per_head": max_rules_per_head,
                     "max_rule_size": max_rule_size,
-                    "time": aba2sat["mean"],
+                    "time_ours": aba2sat["mean"],
+                    "time_theirs": aspforaba['mean'],
                     "stddev": aba2sat['stddev'],
                     "speedup": speedup,
                 })
