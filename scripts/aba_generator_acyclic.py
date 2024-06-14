@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import random
 import argparse
+import random
+import os
 
 def create_framework(n_sentences, n_assumptions, n_rules_per_head, size_of_bodies, cycle_prob):
     """
@@ -60,24 +61,27 @@ def print_ICCMA_format(assumptions, contraries, rules, n_sentences, out_filename
             out.write(f"r {rule[0]} {' '.join(rule[1])}\n")
             #print(f"r {rule[0]} {' '.join(rule[1])}")
 
-def ICCMA23_benchmarks(sentences=[1000,2000,3000,4000,5000], max_rules_per_head_list=[5,10], max_rule_size_list=[5,10], assumption_ratios=[0.1,0.3], count=10, directory="iccma23_aba_benchmarks", identifier="aba"):
+def ICCMA23_benchmarks(sentences=[1000,2000,3000,4000,5000], max_rules_per_head_list=[5,10], max_rule_size_list=[5,10], assumption_ratios=[0.1,0.3], cycle_props=[0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0], count=10, directory="iccma23_aba_benchmarks", identifier="aba"):
     random.seed(811543731122527)
+    # Create directory if missing
+    os.makedirs(directory, exist_ok=True)
     for sentence in sentences:
         for assumption_ratio in assumption_ratios:
             for max_rules_per_head in max_rules_per_head_list:
                 for max_rule_size in max_rule_size_list:
-                    for i in range(count):
-                        number_assumptions = int(round(assumption_ratio*sentence))
-                        number_rules_per_head = range(1,max_rules_per_head+1)
-                        n_spb = range(1,max_rule_size+1)
-                        filename = f"{directory}/{identifier}_{sentence}_{assumption_ratio}_{max_rules_per_head}_{max_rule_size}_{i}.aba"
-                        print(filename)
-                        framework = create_framework(sentence, number_assumptions, number_rules_per_head, n_spb, 0)
-                        query = random.randint(1,number_assumptions)
-                        with open(f"{filename}.asm", 'w') as out:
-                            print(f"{filename}.asm")
-                            out.write(f"{query}")
-                        print_ICCMA_format(framework[0], framework[2], framework[3], sentence, filename)
+                    for cycle_prop in cycle_props:
+                        for i in range(count):
+                            number_assumptions = int(round(assumption_ratio*sentence))
+                            number_rules_per_head = range(1,max_rules_per_head+1)
+                            n_spb = range(1,max_rule_size+1)
+                            filename = f"{directory}/{identifier}_{sentence}_{assumption_ratio}_{max_rules_per_head}_{max_rule_size}_{cycle_prop}_{i}.aba"
+                            print(filename)
+                            framework = create_framework(sentence, number_assumptions, number_rules_per_head, n_spb, cycle_prop)
+                            query = random.randint(1,number_assumptions)
+                            with open(f"{filename}.asm", 'w') as out:
+                                print(f"{filename}.asm")
+                                out.write(f"{query}")
+                            print_ICCMA_format(framework[0], framework[2], framework[3], sentence, filename)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--directory')
@@ -89,7 +93,8 @@ ICCMA23_benchmarks(
     max_rules_per_head_list = [1,2,4,8,16],
     max_rule_size_list = [1,2,4,8,16],
     assumption_ratios = [0.1,0.3,0.5,0.7,0.9],
-    count = 5,
+    cycle_props=[0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0],
+    count = 1,
     directory=args.directory if args.directory is not None else "acyclic",
     identifier=args.identifier if args.identifier is not None else "aba",
 )
