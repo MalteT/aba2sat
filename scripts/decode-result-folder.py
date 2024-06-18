@@ -57,10 +57,13 @@ def run():
             count += 1
         except Exception:
             print(f'Failed to read {file_path}. Skipping..')
-    with open(output, 'w') as output_file:
-        output_file.write
-        writer = csv.DictWriter(output_file, fieldnames=out[0].keys())
-        writer.writeheader()
-        writer.writerows(out)
+    if len(out) > 0:
+        with open(output, 'w') as output_file:
+            output_file.write
+            writer = csv.DictWriter(output_file, fieldnames=out[0].keys())
+            writer.writeheader()
+            writer.writerows(out)
+    else:
+        print('Empty set')
 
 run()
