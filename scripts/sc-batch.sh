@@ -30,6 +30,9 @@ arg=$(cat "$(pwd)/$file.asm")
 # Make sure we get all the data in one central place
 OUTPUT_DIR="output"
 
+# Number of loops to look for
+MAX_LOOPS=18446744073709551615
+
 # Run singularity, this is basically docker
 # We mount /in and /out inside the container and use that to read and write
 
@@ -43,4 +46,4 @@ singularity run \
   --bind "$(pwd)/acyclic:/in:ro" \
   --bind "$(pwd)/$OUTPUT_DIR:/out" \
   validate.sif \
-  validate --file "/in/$basefile" --arg "$arg" --time --problem dc-co
+  validate --file "/in/$basefile" --arg "$arg" --time --problem dc-co --max_loops "$MAX_LOOPS"
