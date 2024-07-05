@@ -41,9 +41,10 @@ MAX_LOOPS=18446744073709551615
 # The docker image was build using
 # > nix bundle .#validate --bundler github:NixOS/bundlers#toDockerImage
 # on my local machine to create an agnostic package that could run on the cluster
+mkdir -p "$(pwd)/$OUTPUT_DIR"
 singularity run \
-  --env OUTPUT_DIR=/out \
-  --bind "$(pwd)/acyclic:/in:ro" \
-  --bind "$(pwd)/$OUTPUT_DIR:/out" \
-  validate.sif \
-  validate --file "/in/$basefile" --arg "$arg" --time --problem dc-co --max_loops "$MAX_LOOPS"
+	--env OUTPUT_DIR=/out \
+	--bind "$(pwd)/acyclic:/in:ro" \
+	--bind "$(pwd)/$OUTPUT_DIR:/out" \
+	validate.sif \
+	validate --file "/in/$basefile" --arg "$arg" --time --problem dc-co --max-loops "$MAX_LOOPS"
