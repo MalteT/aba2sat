@@ -7,6 +7,7 @@ import seaborn as sns
 def read_and_visualize(csv_file):
     # Read the CSV file
     df = pd.read_csv(csv_file)
+    df = df[df['state'] == 'COMPLETED']
 
     # Display the first few rows of the dataframe
     print(df.head())
@@ -21,8 +22,8 @@ def read_and_visualize(csv_file):
     # ax.set_xscale('log')
     # ax.set_yscale('log')
 
-    plt.xlabel("aba2sat")
-    plt.ylabel("ASPforABA")
+    plt.xlabel("aba2sat (t [s])")
+    plt.ylabel("ASPforABA (t [s])")
 
     plt.legend()
     plt.show()
