@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+
+function pause() {
+	read -rp "$(tput dim)Press Enter to continue...$(tput sgr0)"
+	echo
+	echo
+}
+
+function next() {
+	((count += 1))
+	msg="$count. <[$1]> $2"
+	echo "$(tput setaf 4)$(tput smul)$msg$(tput rmul)$(tput sgr0)"
+}
+
+function note() {
+	echo "$(tput bold)$(tput setaf 3)$1$(tput sgr0)"
+}
+
+function user() {
+	echo "$(tput bold)$1$(tput sgr0)"
+}
+
+# Enter run name
+next "*" "define run name"
+read -rp "$(tput bold)Enter run name: " RUN_NAME
+export RUN_NAME
+export RUN_NAME_SAFE="${RUN_NAME//[^[:alnum:]]/-}"
+export INSTANCES_DIR="\$(pwd)/$RUN_NAME_SAFE/instances"
+export INSTANCES_LIST="\$(pwd)/$RUN_NAME_SAFE/instances.list"
+tput sgr0
+echo
+echo
+
+next "HOME" "git tag"
+user "git tag -sm \"executed run $RUN_NAME\" $RUN_NAME_SAFE"
+pause
+
+next "HOME" "bundle"
+user "nix bundle .#container --bundler github:NixOS/bundlers#toDockerImage"
+pause
+
+next "HOME" "send container"
+note "You will need to have 'sc' configured in ssh_config for this"
+user "scp container.tar.gz sc:~/"
+pause
+
+next "HOME" "send scripts"
+note "You will need to have 'sc' configured in ssh_config for this"
+user "scp -r ./scripts sc:~/"
+pause
+
+next "SC" "convert container"
+note "In the home folder ~/"
+user "singularity build container.sif docker-archive://container.tar.gz"
+pause
+
+next "SC" "mkdir"
+user "mkdir -p \"$RUN_NAME_SAFE/instances\""
+pause
+
+next "SC" "aquire"
+user "salloc -N 12 -p paul --time=10:00:00 --cpus-per-task=12"
+pause
+
+next "SC" "generate instances"
+user "srun --ntasks=1 --cpus-per-task=12 \\"
+user "    singularity run --bind \"$INSTANCES_DIR:/out\" container.sif generate \\"
+user "    -d /out \\"
+user "    -i \"$RUN_NAME_SAFE\" \\"
+user "    --sentences 50 100 300 500 1000 2000 4000 6000 \\"
+user "    --max-rules-per-head 1 2 8 16 64 \\"
+user "    --max-rule-size 1 2 8 16 32 \\"
+user "    --assumption-ratios 0.1 0.3 0.5 0.7 0.9 \\"
+user "    --cycle-props 0 0.1 0.2 0.4 0.6 0.8 1.0 \\"
+user "    --count 2"
+pause
+
+next "SC" "random sort"
+user "srun --ntasks=1 --cpus-per-task=1 \\"
+user "    find \"$INSTANCES_DIR\" -type f -iname '*.aba' | sort --random-sort > $INSTANCES_LIST"
+pause
+
+next "SC" "number of instances"
+user "cat $INSTANCES_LIST | wc -l"
+pause
+
+next "*" "enter instance count"
+read -rp "$(tput bold)How many instances are there? " INSTANCE_COUNT
+export INSTANCE_COUNT
+tput sgr0
+echo
+echo
+
+offset=0
+batch=1
+while [ "$INSTANCE_COUNT" -gt 0 ]; do
+	from=1
+	# Calculate how many items to process this iteration
+	if [ "$INSTANCE_COUNT" -gt 14999 ]; then
+		to=14999
+	else
+		to=$INSTANCE_COUNT
+	fi
+
+	next "SC" "execute aba2sat batch #$batch"
+	user "OFFSET=$offset INSTANCES_LIST=\"$INSTANCES_LIST\" INSTANCES=\"$INSTANCES_DIR\" CONTAINER=./container.sif MAX_LOOPS=18446744073709551615 OUTPUT_DIR=\"$RUN_NAME_SAFE/output\" sbatch --array $from-$to \\"
+	user "    --mail-type BEGIN,END,FAIL \\"
+	user "    --output '$RUN_NAME_SAFE/slurms/slurm-%A_%a.out' \\"
+	user "    --job-name '$RUN_NAME_SAFE-aba2sat' \\"
+	user "    --export ALL \\"
+	user "    ./scripts/sc-aba2sat"
+	pause
+
+	next "*" "Fetch batch job id"
+	read -rp "$(tput bold)Enter batch job ID: " BATCH_JOB_ID
+	tput sgr0
+	echo
+	echo
+
+	next "SC" "collect jobinfo fo aba2sat batch #$batch"
+	user "sacct -j $BATCH_JOB_ID --format=all --json > $RUN_NAME_SAFE/jobinfo-aba2sat-$batch.json"
+	pause
+
+	next "SC" "execute ASPforABA batch #$batch"
+	user "OFFSET=$offset INSTANCES_LIST=\"$INSTANCES_LIST\" INSTANCES=\"$INSTANCES_DIR\" CONTAINER=./container.sif OUTPUT_DIR=\"$RUN_NAME_SAFE/output\" sbatch --array $from-$to \\"
+	user "    --mail-type BEGIN,END,FAIL \\"
+	user "    --output '$RUN_NAME_SAFE/slurms/slurm-%A_%a.out' \\"
+	user "    --job-name '$RUN_NAME_SAFE-aspforaba' \\"
+	user "    --export ALL \\"
+	user "    ./scripts/sc-aspforaba"
+	pause
+
+	next "*" "Fetch batch job id"
+	read -rp "$(tput bold)Enter batch job ID: " BATCH_JOB_ID
+	tput sgr0
+	echo
+	echo
+
+	next "SC" "collect jobinfo fo aspforaba batch #$batch"
+	user "sacct -j $BATCH_JOB_ID --format=all --json > $RUN_NAME_SAFE/jobinfo-aspforaba-$batch.json"
+	pause
+
+	# Decrease remaining count and increase offset for next iteration
+	INSTANCE_COUNT=$((INSTANCE_COUNT - to))
+	offset=$((offset + 15000))
+	((batch += 1))
+done
+
+next "SC" "bundle"
+user "srun --ntasks=1 zip -9r '$RUN_NAME_SAFE.zip' '$RUN_NAME_SAFE/'"
+pause

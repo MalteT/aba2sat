@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#SBATCH --time=4:00:00
+#SBATCH --mem=4G
+
+# EXPECTED ENVIRONMENT
+# - SLURM_ARRAY_TASK_ID
+# - INSTANCES
+# - INSTANCES_LIST
+# - OFFSET
+# - CONTAINER
+# - OUTPUT_DIR
+
+NR="$(("${OFFSET:=0}" + "$SLURM_ARRAY_TASK_ID"))"
+
+# Pick line `$SLURM_ARRAY_TASK_ID` from the FILE_LIST
+file="$(awk "NR == $NR" "$INSTANCES_LIST")"
+basefile=$(basename $file)
+# Read the extra argument
+arg=$(cat "$file.asm")
+
+mkdir -p "$OUTPUT_DIR"
+
+singularity run \
+	--env OUTPUT_DIR=/out \
+	--bind "$INSTANCES:/in:ro" \
+	--bind "$OUTPUT_DIR:/out" \
+  $CONTAINER \
+  ASPforABA -p DC-CO -f "/in/$basefile" -a "$arg" | tee "$OUTPUT_DIR/$basefile-aspforaba-result"

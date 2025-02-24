@@ -158,17 +158,23 @@ def ICCMA23_benchmarks(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--directory")
-    parser.add_argument("-i", "--identifier")
+    parser.add_argument("-d", "--directory", required=True, help="Output directory for benchmarks")
+    parser.add_argument("-i", "--identifier", required=True, help="Identifier for the benchmark files")
+    parser.add_argument("--sentences", nargs="+", type=int, required=True, help="List of sentence counts")
+    parser.add_argument("--max-rules-per-head", nargs="+", type=int, required=True, help="List of maximum rules per head")
+    parser.add_argument("--max-rule-size", nargs="+", type=int, required=True, help="List of maximum rule sizes")
+    parser.add_argument("--assumption-ratios", nargs="+", type=float, required=True, help="List of assumption ratios")
+    parser.add_argument("--cycle-props", nargs="+", type=float, required=True, help="List of cycle proportions")
+    parser.add_argument("--count", type=int, required=True, help="Number of benchmarks to generate")
     args = parser.parse_args()
 
     ICCMA23_benchmarks(
-        sentences=[50, 100, 300, 500, 1000, 2000, 4000, 6000],
-        max_rules_per_head_list=[1, 2, 8, 16, 64],
-        max_rule_size_list=[1, 2, 8, 16, 32],
-        assumption_ratios=[0.1, 0.3, 0.5, 0.7, 0.9],
-        cycle_props=[0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0],
-        count=2,
-        directory=args.directory if args.directory is not None else "acyclic",
-        identifier=args.identifier if args.identifier is not None else "aba",
+        sentences=args.sentences,
+        max_rules_per_head_list=args.max_rules_per_head,
+        max_rule_size_list=args.max_rule_size,
+        assumption_ratios=args.assumption_ratios,
+        cycle_props=args.cycle_props,
+        count=args.count,
+        directory=args.directory,
+        identifier=args.identifier,
     )
