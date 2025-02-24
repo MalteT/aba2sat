@@ -185,6 +185,27 @@
                 text = builtins.readFile ./scripts/validate.sh;
               };
 
+              container = pkgs.buildEnv {
+                name = "container";
+                paths = [
+                  aba2sat
+                  aspforaba
+                  pkgs.coreutils
+                  pkgs.bash
+                  (pkgs.python3.pkgs.buildPythonApplication {
+                    name = "generate";
+                    version = "0.0.1";
+                    src = lib.sourceByRegex ./. [ "scripts" "scripts/aba-generator-acyclic.py" ];
+                    format = "other";
+                    installPhase = ''
+                      mkdir -p $out/bin
+                      cp scripts/aba-generator-acyclic.py $out/bin/generate
+                      chmod +x $out/bin/generate
+                    '';
+                  })
+                ];
+              };
+
               sc-batch = pkgs.writeShellApplication {
                 name = "sc-batch";
                 runtimeInputs = [
@@ -220,7 +241,7 @@
               aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix { inherit (self'.packages) clingo; };
             in
             {
-              inherit validate aba2sat aspforaba sc-batch decode-result-folder aba-generator-acyclic;
+              inherit validate aba2sat aspforaba sc-batch decode-result-folder aba-generator-acyclic container;
               default = aba2sat;
               clingo = pkgs.callPackage ./nix/packages/clingo.nix { };
             }
