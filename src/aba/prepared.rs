@@ -4,7 +4,7 @@ use crate::{
     aba::{traverse::loops_of, Num},
     clauses::Clause,
     literal::{
-        lits::{LoopHelper, TheoryRuleBodyActive},
+        lits::{CandidateRuleBodyActive, LoopHelper},
         IntoLiteral,
     },
 };
@@ -77,7 +77,7 @@ impl PreparedAba {
             let last_clause = r#loop
                 .support
                 .iter()
-                .map(|el| TheoryRuleBodyActive::from(*el).pos())
+                .map(|el| CandidateRuleBodyActive::from(*el).pos())
                 .chain(std::iter::once(LoopHelper::from(loop_id).neg()))
                 .collect();
             // -l or LH_i
@@ -90,7 +90,7 @@ impl PreparedAba {
             // LH_i or -RBA_x
             let tuple_clauses = r#loop.support.iter().map(move |rule_id| {
                 Clause::from(vec![
-                    TheoryRuleBodyActive::from(*rule_id).neg(),
+                    CandidateRuleBodyActive::from(*rule_id).neg(),
                     LoopHelper::from(loop_id).pos(),
                 ])
             });

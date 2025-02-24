@@ -41,20 +41,20 @@ pub mod lits {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct Theory(Num);
-    into_raw!(Theory from Num);
+    pub struct Candidate(Num);
+    into_raw!(Candidate from Num);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct TheoryRuleBodyActive(usize);
-    into_raw!(TheoryRuleBodyActive from usize);
+    pub struct CandidateRuleBodyActive(usize);
+    into_raw!(CandidateRuleBodyActive from usize);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct TheorySet(Num);
-    into_raw!(TheorySet from Num);
+    pub struct Attacker(Num);
+    into_raw!(Attacker from Num);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct TheorySetRuleBodyActive(usize);
-    into_raw!(TheorySetRuleBodyActive from usize);
+    pub struct AttackerRuleBodyActive(usize);
+    into_raw!(AttackerRuleBodyActive from usize);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct LoopHelper(usize);
@@ -74,10 +74,10 @@ pub enum Literal {
 /// extend this type for every new literal type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RawLiteral {
-    Theory(lits::Theory),
-    TheoryRuleBodyActive(lits::TheoryRuleBodyActive),
-    TheorySet(lits::TheorySet),
-    TheorySetRuleBodyActive(lits::TheorySetRuleBodyActive),
+    Candidate(lits::Candidate),
+    CandidateRuleBodyActive(lits::CandidateRuleBodyActive),
+    Attacker(lits::Attacker),
+    AttackerRuleBodyActive(lits::AttackerRuleBodyActive),
     LoopHelper(lits::LoopHelper),
 }
 

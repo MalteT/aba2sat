@@ -5,7 +5,7 @@ use crate::{
     clauses::{Clause, ClauseList},
     error::Error,
     literal::{
-        lits::{Theory, TheorySet},
+        lits::{Attacker, Candidate},
         IntoLiteral,
     },
     Result,
@@ -34,8 +34,8 @@ fn initial_complete_clauses(aba: &PreparedAba) -> ClauseList {
         // For any assumption `a` and it's inverse `b`:
         //   b not in th(A) => a in th(S)
         clauses.push(Clause::from(vec![
-            Theory::from(*inverse).pos(),
-            TheorySet::from(*assumption).pos(),
+            Candidate::from(*inverse).pos(),
+            Attacker::from(*assumption).pos(),
         ]));
     }
     clauses
@@ -56,9 +56,9 @@ impl MultishotProblem for EnumerateCompleteExtensions {
                     .assumptions()
                     .map(|assumption| {
                         if just_found.contains(assumption) {
-                            TheorySet::from(*assumption).neg()
+                            Attacker::from(*assumption).neg()
                         } else {
-                            TheorySet::from(*assumption).pos()
+                            Attacker::from(*assumption).pos()
                         }
                     })
                     .collect();
@@ -67,7 +67,7 @@ impl MultishotProblem for EnumerateCompleteExtensions {
         }
     }
 
-    fn feedback(&mut self, state: SolverState<'_>) -> LoopControl {
+    fn feedback(&mut self, state: SolverState<'_>, _iteration: usize) -> LoopControl {
         if !state.sat_result {
             return LoopControl::Stop;
         }
@@ -77,7 +77,7 @@ impl MultishotProblem for EnumerateCompleteExtensions {
             .inverses
             .keys()
             .filter_map(|assumption| {
-                let literal = TheorySet::from(*assumption).pos();
+                let literal = Attacker::from(*assumption).pos();
                 let raw = state.map.get_raw(&literal)?;
                 match state.solver.value(raw) {
                     Some(true) => Some(*assumption),
@@ -99,7 +99,7 @@ impl Problem for DecideCredulousComplete {
 
     fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
         let mut clauses = initial_complete_clauses(aba);
-        clauses.push(Clause::from(vec![TheorySet::from(self.element).pos()]));
+        clauses.push(Clause::from(vec![Attacker::from(self.element).pos()]));
         clauses
     }
 

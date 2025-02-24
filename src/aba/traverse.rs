@@ -40,6 +40,7 @@ pub fn loops_of(aba: &Aba) -> Loops<'_> {
 impl<'a> Iterator for Loops<'a> {
     type Item = Loop;
 
+    // TODO: We could run Tarjan first to split everything into SCCs to decrease the exponent of the runtime of this algorithm with linear overhead
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             // Ensure that the rule_indices list is not empty, if it is, we're done

@@ -3,7 +3,7 @@ use cadical::Solver;
 use crate::{
     clauses::ClauseList,
     error::{Error, Result},
-    literal::lits::Theory,
+    literal::lits::Candidate,
     mapper::Mapper,
 };
 
@@ -41,7 +41,7 @@ pub trait Problem {
 pub trait MultishotProblem {
     type Output;
     fn additional_clauses(&self, aba: &PreparedAba, iteration: usize) -> ClauseList;
-    fn feedback(&mut self, state: SolverState<'_>) -> LoopControl;
+    fn feedback(&mut self, state: SolverState<'_>, iteration: usize) -> LoopControl;
     fn construct_output(self, state: SolverState<'_>, total_iterations: usize) -> Self::Output;
 
     fn check(&self, _aba: &Aba) -> Result {
@@ -59,7 +59,7 @@ pub fn solve<P: Problem>(problem: P, aba: Aba, max_loops: Option<usize>) -> Resu
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
+    let clauses: ClauseList = aba.derive_clauses::<Candidate>().collect();
     // Append additional clauses as defined by the problem
     let additional_clauses = problem.additional_clauses(&aba);
     // Convert the total of our derived clauses using the mapper
@@ -103,7 +103,7 @@ pub fn multishot_solve<P: MultishotProblem>(
     // Instantiate a new SAT solver instance
     let mut sat: Solver = Solver::default();
     // Derive clauses from the ABA
-    let clauses: ClauseList = aba.derive_clauses::<Theory>().collect();
+    let clauses: ClauseList = aba.derive_clauses::<Candidate>().collect();
     // Convert the total of our derived clauses using the mapper
     // and feed the solver with the result
     map.as_raw_iter(&clauses)
@@ -128,12 +128,15 @@ pub fn multishot_solve<P: MultishotProblem>(
         // Call our problem to ask whether we should continue. This is the point
         // where the problem instance can exit the loop our mutate inner state
         // with the solver feedback and continue
-        let control = problem.feedback(SolverState {
-            aba: &aba,
-            sat_result,
-            solver: &sat,
-            map: &map,
-        });
+        let control = problem.feedback(
+            SolverState {
+                aba: &aba,
+                sat_result,
+                solver: &sat,
+                map: &map,
+            },
+            iteration,
+        );
         // Exit if the problem instance requested it
         if control == LoopControl::Stop {
             break sat_result;

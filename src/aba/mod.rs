@@ -122,12 +122,12 @@ pub trait Context {
     type Rule: From<usize> + Into<RawLiteral> + 'static;
 }
 
-impl Context for crate::literal::lits::Theory {
+impl Context for crate::literal::lits::Candidate {
     type Base = Self;
-    type Rule = crate::literal::lits::TheoryRuleBodyActive;
+    type Rule = crate::literal::lits::CandidateRuleBodyActive;
 }
 
-impl Context for crate::literal::lits::TheorySet {
+impl Context for crate::literal::lits::Attacker {
     type Base = Self;
-    type Rule = crate::literal::lits::TheorySetRuleBodyActive;
+    type Rule = crate::literal::lits::AttackerRuleBodyActive;
 }
