@@ -26,6 +26,7 @@ pub struct PreparedAba {
 impl PreparedAba {
     /// Create a new [`PreparedAba`] from a raw [`Aba`]
     pub fn new(mut aba: Aba, max_loops: Option<usize>) -> Self {
+        trim_trivial_cycles(&mut aba);
         trim_unreachable_rules(&mut aba);
         let loops = match max_loops {
             Some(0) => vec![],
@@ -169,6 +170,12 @@ fn trim_unreachable_rules(aba: &mut Aba) {
         // Both the head and all elements from the body must be reachable
         reachable.contains(head) && body.iter().all(|atom| reachable.contains(atom))
     });
+}
+
+/// Rules that contain their own head in the body
+/// can never be activated, just drop them
+fn trim_trivial_cycles(aba: &mut Aba) {
+    aba.rules.retain(|(head, body)| !body.contains(head))
 }
 
 fn calculate_loops_and_their_support(

@@ -223,3 +223,18 @@ fn loops_and_conflicts_2() {
             .unwrap();
     assert!(result, "b is credulous complete");
 }
+
+#[test]
+fn rules_with_trivial_cycles() {
+    let aba = DebugAba::default()
+        .with_assumption('a', 'd')
+        .with_assumption('b', 'a')
+        .with_rule('c', ['b'])
+        .with_rule('d', ['a'])
+        .with_rule('d', ['d', 'c']);
+    let element = aba.forward_atom('b').unwrap();
+    let result =
+        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone(), None)
+            .unwrap();
+    assert!(!result, "b is not credulous complete");
+}
