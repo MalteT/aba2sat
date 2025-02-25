@@ -59,7 +59,7 @@ user "mkdir -p \"$RUN_NAME_SAFE/instances\""
 pause
 
 next "SC" "aquire"
-user "salloc -N 12 -p paul --time=10:00:00 --cpus-per-task=12"
+user "salloc -N 1 -p paul --time=10:00:00 --cpus-per-task=12"
 pause
 
 next "SC" "generate instances"

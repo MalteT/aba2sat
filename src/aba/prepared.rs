@@ -182,7 +182,7 @@ fn calculate_loops_and_their_support(
     aba: &Aba,
     max_loops: Option<usize>,
 ) -> impl Iterator<Item = Loop> + '_ {
-    let max_loops = max_loops.unwrap_or_else(|| aba.universe().collect::<HashSet<_>>().len());
+    let max_loops = max_loops.unwrap_or(usize::MAX);
     loops_of(aba).enumerate().map_while(move |(idx, l)| {
         if idx >= max_loops {
             eprintln!("Too many loops! {max_loops}");
