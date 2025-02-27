@@ -191,6 +191,9 @@
                   aba2sat
                   pkgs.coreutils
                   pkgs.jq
+                  pkgs.gawk
+                  pkgs.gnugrep
+                  pkgs.ripgrep
                 ];
                 text = builtins.readFile ./scripts/analyse-instance;
               };
