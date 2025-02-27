@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
-use super::{Aba, Num};
+use super::{Aba, Num, RuleList};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 struct RuleIdx(usize);
@@ -17,7 +17,11 @@ struct UniverseIdx(usize);
 #[derive(Debug)]
 pub struct Loops<'a> {
     aba: &'a Aba,
-    active: HashSet<Num>,
+    /// Strongly Connected Components
+    /// These are the indizes of the SCCs as used in tarjans algorithm
+    /// such that the index of a rule in aba.rules can be used here
+    /// to get the component of the rule's head
+    sccs: Vec<usize>,
     rule_indices: Vec<RuleIdx>,
     found: Vec<Loop>,
 }
@@ -28,10 +32,10 @@ pub struct Loop {
 }
 
 pub fn loops_of(aba: &Aba) -> Loops<'_> {
-    let active = aba.assumptions().cloned().collect();
+    let sccs = compute_scc_indizes(&aba.rules);
     Loops {
         aba,
-        active,
+        sccs,
         rule_indices: vec![RuleIdx(0)],
         found: vec![],
     }
@@ -40,7 +44,6 @@ pub fn loops_of(aba: &Aba) -> Loops<'_> {
 impl<'a> Iterator for Loops<'a> {
     type Item = Loop;
 
-    // TODO: We could run Tarjan first to split everything into SCCs to decrease the exponent of the runtime of this algorithm with linear overhead
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             // Ensure that the rule_indices list is not empty, if it is, we're done
@@ -55,8 +58,6 @@ impl<'a> Iterator for Loops<'a> {
                 self.rule_indices.pop();
                 match self.rule_indices.last_mut() {
                     Some(idx) => {
-                        let (head, _body) = &self.aba.rules[idx.0];
-                        self.active.remove(head);
                         idx.advance();
                         continue;
                     }
@@ -82,47 +83,155 @@ impl<'a> Iterator for Loops<'a> {
                     self.rule_indices.last_mut().unwrap().advance();
                     continue;
                 }
+                // If this rule's head's SCC differs from the SCC of the previous rule's head
+                // we can simply skip the current rule as there would be no coming back after
+                // leaving this SCC
+                if self.sccs[last_rule_idx.0] != self.sccs[rule_idx.0] {
+                    self.rule_indices.last_mut().unwrap().advance();
+                    continue;
+                }
+            } else {
+                // Check that we're not just having a body full of assumptions
+                let (_, body) = &self.aba.rules[rule_idx.0];
+                let assumptions = self.aba.assumptions().collect::<HashSet<_>>();
+                if !body.iter().any(|element| !assumptions.contains(element)) {
+                    self.rule_indices.last_mut().unwrap().advance();
+                    continue;
+                }
             }
             // Still rules to try
-            let (head, body) = &self.aba.rules[rule_idx.0];
-            if body.is_subset(&self.active) {
-                // The rule can be applied
-                if self.active.contains(head) {
-                    // The rule head is already active, loop found!
-                    let heads = self.rule_indices[0..self.rule_indices.len() - 1]
-                        .iter()
-                        .rev()
-                        .map_while(|rule_idx| {
-                            let (old_head, _body) = &self.aba.rules[rule_idx.0];
-                            if *old_head != *head {
-                                Some(*old_head)
-                            } else {
-                                None
-                            }
-                        })
-                        // Add the current head to the loop, as it is not in the active list
-                        .chain(std::iter::once(*head))
-                        .collect();
-                    // Advance the rule index for the next call
-                    // Safe! No adjustment to the rule_indices since the last check at the start of the loop
-                    self.rule_indices.last_mut().unwrap().advance();
-                    let new_loop = Loop { heads };
-                    if !self.found.contains(&new_loop) {
-                        self.found.push(new_loop.clone());
-                        break Some(new_loop);
-                    } else {
-                        continue;
-                    }
-                }
-                // The rule could be applied and does not cause a conflict
-                // Go one level deeper
-                self.rule_indices.push(RuleIdx(0));
-                self.active.insert(*head);
-            } else {
+            let (head, _) = &self.aba.rules[rule_idx.0];
+            // Check whether the head of the current rule is part of the body
+            // of the first rule in our branch, if so, the entire branch is a loop
+            if self.aba.rules[self.rule_indices[0].0].1.contains(head) {
+                // The rule head is already active, loop found!
+                let heads = self
+                    .rule_indices
+                    .iter()
+                    .map(|RuleIdx(idx)| self.aba.rules[*idx].0)
+                    .collect::<HashSet<_>>();
+                // Advance the rule index for the next call
+                // Safe! No adjustment to the rule_indices since the last check at the start of the loop
                 self.rule_indices.last_mut().unwrap().advance();
+                let new_loop = Loop {
+                    heads: heads.clone(),
+                };
+                if !self.found.contains(&new_loop) {
+                    self.found.push(new_loop.clone());
+                    break Some(new_loop);
+                } else {
+                    continue;
+                }
+            }
+            // The rule could be applied and does not cause a conflict
+            // Go one level deeper
+            self.rule_indices.push(RuleIdx(0));
+        }
+    }
+}
+
+fn compute_scc_indizes(rules: &RuleList) -> Vec<usize> {
+    // We're only interested in atoms that can be reached via a rule.
+    // Since every head may have multiple rules, we join their bodies here.
+    // Instead of using the direction `body` -> `head` as our `edge`, we
+    // invert that, since sccs are unchanged by a flip of the edge and we
+    // already have all the info on hand
+    let succ = rules.iter().fold(
+        BTreeMap::<Num, HashSet<Num>>::new(),
+        |mut map, (head, body)| {
+            map.entry(*head).or_default().extend(body);
+            map
+        },
+    );
+    // current tarjan index
+    let mut index = 0;
+    // The stack (our SCC in the making)
+    let mut stack: Vec<Num> = vec![];
+    /// The tuple (index, lowlink, onStack)
+    #[derive(Debug)]
+    struct Info {
+        index: usize,
+        lowlink: usize,
+        on_stack: bool,
+    }
+    // information about all elements of our "graph"
+    let mut info: BTreeMap<Num, Info> = BTreeMap::new();
+    // Tarjans strongconnect function
+    fn strong_connect(
+        succ: &BTreeMap<Num, HashSet<Num>>,
+        info: &mut BTreeMap<Num, Info>,
+        stack: &mut Vec<Num>,
+        index: &mut usize,
+        node: Num,
+    ) {
+        // Set the node's index and lowlink and on_stack
+        info.insert(
+            node,
+            Info {
+                index: *index,
+                lowlink: *index,
+                on_stack: true,
+            },
+        );
+        *index += 1;
+        // Push the node onto the stack
+        stack.push(node);
+        // an extra check is necessary here, as some atoms may not be
+        // head to a rule, like assumptions
+        let successors = match succ.get(&node) {
+            Some(successor) => successor,
+            None => {
+                return;
+            }
+        };
+        // Iterate over successor nodes
+        for successor in successors {
+            match info.get(successor) {
+                // Not yet visited
+                None => {
+                    strong_connect(succ, info, stack, index, *successor);
+                    let successor_lowlink = info.get(successor).unwrap().lowlink;
+                    let node_info = info.get_mut(&node).unwrap();
+                    node_info.lowlink = node_info.lowlink.min(successor_lowlink);
+                }
+                // Visited and in the same SCC
+                Some(i) if i.on_stack => {
+                    let successor_index = info.get(successor).unwrap().index;
+                    let node_info = info.get_mut(&node).unwrap();
+                    node_info.lowlink = node_info.lowlink.min(successor_index);
+                }
+                // Already part of another SCC
+                _ => {}
+            }
+        }
+        let node_info = info.get(&node).unwrap();
+        let node_info_lowlink = node_info.lowlink;
+        // This is the root node of the SCC
+        if node_info.lowlink == node_info.index {
+            // we don't need to create the SCC, we're only interested in the final index values
+            loop {
+                // Remove the SCC from the stack
+                let popped = stack.pop().unwrap();
+                let popped_info = info.get_mut(&popped).unwrap();
+                popped_info.on_stack = false;
+                popped_info.lowlink = node_info_lowlink;
+                if popped == node {
+                    break;
+                }
             }
         }
     }
+    // iterate over all elements and their successors
+    for node in succ.keys() {
+        if !info.contains_key(node) {
+            strong_connect(&succ, &mut info, &mut stack, &mut index, *node)
+        }
+    }
+    // map our findings to the rules
+    rules
+        .iter()
+        .map(|(head, _)| info.get(head).unwrap().lowlink)
+        .collect()
 }
 
 #[cfg(test)]
@@ -215,5 +324,18 @@ mod tests {
         // The iterator should be empty now
         assert!(matches!(loops.next(), None));
         assert!(matches!(loops.next(), None));
+    }
+
+    #[test]
+    fn scc_test() {
+        let aba = DebugAba::default()
+            .with_rule('p', ['q'])
+            .with_rule('q', ['p'])
+            .with_rule('u', ['v'])
+            .with_rule('v', ['w'])
+            .with_rule('w', ['u']);
+        let rules = &aba.aba().rules;
+        let scc_indizes = compute_scc_indizes(rules);
+        assert_eq!(vec![0, 0, 2, 2, 2], scc_indizes);
     }
 }

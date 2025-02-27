@@ -73,4 +73,112 @@ mod tests {
             .with_rule('c', ['b']);
         assert_eq!(count_loops(aba.aba(), None), 1);
     }
+
+    #[test]
+    pub fn k_3() {
+        let aba = DebugAba::default()
+            .with_assumption('a', 'c')
+            .with_rule('b', ['a'])
+            .with_rule('c', ['a'])
+            .with_rule('d', ['a'])
+            .with_rule('c', ['b'])
+            .with_rule('d', ['b'])
+            .with_rule('b', ['c'])
+            .with_rule('d', ['c'])
+            .with_rule('b', ['d'])
+            .with_rule('c', ['d']);
+        assert_eq!(count_loops(aba.aba(), None), 4);
+    }
+
+    #[test]
+    pub fn k_3_minus_one() {
+        let aba = DebugAba::default()
+            .with_assumption('a', 'c')
+            .with_rule('b', ['a'])
+            .with_rule('c', ['a'])
+            .with_rule('d', ['a'])
+            .with_rule('d', ['b'])
+            .with_rule('b', ['c'])
+            .with_rule('d', ['c'])
+            .with_rule('b', ['d'])
+            .with_rule('c', ['d']);
+        assert_eq!(count_loops(aba.aba(), None), 3);
+    }
+
+    #[test]
+    pub fn k_3_minus_two() {
+        let aba = DebugAba::default()
+            .with_assumption('a', 'b')
+            .with_rule('b', ['a'])
+            .with_rule('c', ['a'])
+            .with_rule('d', ['a'])
+            .with_rule('d', ['b'])
+            .with_rule('d', ['c'])
+            .with_rule('b', ['d'])
+            .with_rule('c', ['d']);
+        assert_eq!(count_loops(aba.aba(), None), 3);
+    }
+
+    #[test]
+    pub fn k_5() {
+        let aba = DebugAba::default()
+            .with_assumption('a', 'c')
+            .with_rule('b', ['a'])
+            .with_rule('c', ['a'])
+            .with_rule('d', ['a'])
+            .with_rule('e', ['a'])
+            .with_rule('f', ['a'])
+            .with_rule('c', ['b'])
+            .with_rule('d', ['b'])
+            .with_rule('e', ['b'])
+            .with_rule('f', ['b'])
+            .with_rule('b', ['c'])
+            .with_rule('d', ['c'])
+            .with_rule('e', ['c'])
+            .with_rule('f', ['c'])
+            .with_rule('b', ['d'])
+            .with_rule('c', ['d'])
+            .with_rule('e', ['d'])
+            .with_rule('f', ['d'])
+            .with_rule('b', ['e'])
+            .with_rule('c', ['e'])
+            .with_rule('d', ['e'])
+            .with_rule('f', ['e'])
+            .with_rule('b', ['f'])
+            .with_rule('c', ['f'])
+            .with_rule('d', ['f'])
+            .with_rule('e', ['f']);
+        assert_eq!(count_loops(aba.aba(), None), 26);
+    }
+
+    #[test]
+    pub fn k_5_adjusted() {
+        let aba = DebugAba::default()
+            .with_assumption('a', 'c')
+            .with_rule('b', ['a'])
+            .with_rule('c', ['a'])
+            .with_rule('d', ['a'])
+            .with_rule('e', ['a'])
+            .with_rule('f', ['a'])
+            .with_rule('d', ['b'])
+            .with_rule('e', ['b'])
+            .with_rule('f', ['b'])
+            .with_rule('b', ['c'])
+            .with_rule('d', ['c'])
+            .with_rule('e', ['c'])
+            .with_rule('f', ['c'])
+            .with_rule('b', ['d'])
+            .with_rule('c', ['d'])
+            .with_rule('e', ['d'])
+            .with_rule('f', ['d'])
+            .with_rule('b', ['e'])
+            .with_rule('c', ['e'])
+            .with_rule('d', ['e'])
+            .with_rule('f', ['e'])
+            .with_rule('b', ['f'])
+            .with_rule('c', ['f'])
+            .with_rule('d', ['f'])
+            .with_rule('e', ['f']);
+        assert_eq!(count_loops(aba.aba(), None), 25);
+    }
 }
