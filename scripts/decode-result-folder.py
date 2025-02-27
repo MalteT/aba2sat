@@ -145,7 +145,7 @@ def run():
                     "array_id": job["array"]["job_id"],
                     "task_id": job["array"]["task_id"]["number"],
                     "status": job["derived_exit_code"]["status"][0],
-                    "flags": ",".join(job["flags"]),
+                    "flags": " ".join(job["flags"]),
                     "state": job["state"]["current"][0],
                     "time": time,
                 }

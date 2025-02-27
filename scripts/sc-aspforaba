@@ -21,8 +21,8 @@ arg=$(cat "$file.asm")
 mkdir -p "$OUTPUT_DIR"
 
 singularity run \
-	--env OUTPUT_DIR=/out \
-	--bind "$INSTANCES:/in:ro" \
-	--bind "$OUTPUT_DIR:/out" \
+  --env OUTPUT_DIR=/out \
+  --bind "$INSTANCES:/in:ro" \
+  --bind "$OUTPUT_DIR:/out" \
   $CONTAINER \
   ASPforABA -p DC-CO -f "/in/$basefile" -a "$arg" | tee "$OUTPUT_DIR/$basefile-aspforaba-result"
