@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+print_help_and_exit() {
+	if [ -n "$1" ]; then
+		printf "%s\n\n" "$1"
+	fi
+	printf "Usage: analyse-instance [OPTIONS] \n" >&2
+	printf "\n" >&2
+	printf "Options:\n" >&2
+	printf "  -f, --file\n" >&2
+	printf "          The file containing the problem in ABA format\n" >&2
+	printf "  --timeout-secs NUM (Default: 3600)\n" >&2
+	printf "          Set the maximum number of seconds to search for loops\n" >&2
+	printf "  --max-loops NUM (Default: unbound)\n" >&2
+	printf "          Set the maximum number of loops to search for\n" >&2
+	exit 1
+}
+
+POSITIONAL_ARGS=()
+ABA_FILE=
+MAX_LOOPS=
+TIMEOUT=3600
+
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-h | --help)
+			print_help_and_exit ""
+			;;
+		-f | --file)
+			shift
+			ABA_FILE=$1
+			shift
+			;;
+		--max-loops)
+			shift
+			MAX_LOOPS=$1
+			shift
+			;;
+		--timeout-secs)
+			shift
+			TIMEOUT=$1
+			shift
+			;;
+		-*)
+			print_help_and_exit "Unknown option $1"
+			;;
+		*)
+			POSITIONAL_ARGS+=("$1") # save positional arg
+			shift                   # past argument
+			;;
+	esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+if [ -z "${ABA_FILE}" ]; then
+	print_help_and_exit "--file not given"
+fi
+
+assumption_count=$(rg "^a" --count "$ABA_FILE")
+
+# Extract the count of b values for each line
+# Each line starts with 'r', then has an 'h' value, then some number of 'b' values
+counts=$(grep -E '^r\s+[0-9]+' "$ABA_FILE" | awk '{print NF - 2}' | sort -n)
+
+line_count=$(echo "$counts" | wc -l)
+
+if [ "$line_count" -eq 0 ]; then
+	echo "No matching lines found in the input file." >&2
+	exit 1
+fi
+
+# Calculate statistics
+max=$(echo "$counts" | tail -1)
+min=$(echo "$counts" | head -1)
+
+# Calculate sum and sum of squares for average and stddev
+sum=0
+sum_squares=0
+while read -r count; do
+	sum=$((sum + count))
+	sum_squares=$((sum_squares + (count * count)))
+done <<<"$counts"
+
+# Calculate average
+average=$(awk -v sum="$sum" -v count="$line_count" 'BEGIN {printf "%.2f", sum/count}')
+
+# Calculate standard deviation
+variance=$(awk -v sum="$sum" -v sum_sq="$sum_squares" -v count="$line_count" 'BEGIN {printf "%.6f", (sum_sq - (sum*sum)/count)/(count-1)}')
+stddev=$(awk -v var="$variance" 'BEGIN {printf "%.2f", sqrt(var)}')
+
+loop_status=OK
+# Calculate the number of loops
+if [ -z "${MAX_LOOPS}" ]; then
+	loops=$(timeout "$TIMEOUT" count-loops --file "$ABA_FILE")
+else
+	loops=$(timeout "$TIMEOUT" count-loops --max-loops "$MAX_LOOPS" --file "$ABA_FILE")
+fi
+
+if [ -z "$loops" ]; then
+	loops=0
+	loop_status=TIMEOUT
+fi
+
+if [ "$loops" -eq "$MAX_LOOPS" ]; then
+	loop_status=MAX
+fi
+
+jq -n --compact-output \
+	--arg assumptions "$assumption_count" \
+	--arg rules "$line_count" \
+	--arg average "$average" \
+	--arg min "$min" \
+	--arg max "$max" \
+	--arg stddev "$stddev" \
+	--arg loops "$loops" \
+	--arg loops_status "$loop_status" \
+	'{
+      "assumptions": $assumptions,
+      "rules": $rules,
+      "rule_body_average": $average,
+      "rule_body_minimum": $min,
+      "rule_body_maximum": $max,
+      "rule_body_stddev": $stddev,
+      "loops": $loops,
+      "loops_status": $loops_status
+    }'

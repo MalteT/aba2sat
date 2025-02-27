@@ -185,11 +185,22 @@
                 text = builtins.readFile ./scripts/validate.sh;
               };
 
+              analyse-instance = pkgs.writeShellApplication {
+                name = "analyse-instance";
+                runtimeInputs = [
+                  aba2sat
+                  pkgs.coreutils
+                  pkgs.jq
+                ];
+                text = builtins.readFile ./scripts/analyse-instance;
+              };
+
               container = pkgs.buildEnv {
                 name = "container";
                 paths = [
                   aba2sat
                   aspforaba
+                  analyse-instance
                   pkgs.coreutils
                   pkgs.bash
                   (pkgs.python3.pkgs.buildPythonApplication {
@@ -241,7 +252,7 @@
               aspforaba = pkgs.callPackage ./nix/packages/aspforaba.nix { inherit (self'.packages) clingo; };
             in
             {
-              inherit validate aba2sat aspforaba sc-batch decode-result-folder aba-generator-acyclic container;
+              inherit validate aba2sat aspforaba sc-batch decode-result-folder aba-generator-acyclic container analyse-instance;
               default = aba2sat;
               clingo = pkgs.callPackage ./nix/packages/clingo.nix { };
             }
