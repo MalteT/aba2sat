@@ -3,7 +3,7 @@
 import json
 import os
 import csv
-from typing import NewType, TypedDict
+from typing import NewType, TypedDict, Union
 
 Instance = NewType("Instance", str)
 
@@ -16,9 +16,19 @@ class JobSummary(TypedDict):
     state: str
     time: float
 
+class Analysis(TypedDict):
+    assumptions: int
+    rules: int
+    rule_body_average: float
+    rule_body_minimum: float
+    rule_body_maximum: float
+    rule_body_stddev: float
+    loops: int
+    loops_status: str
+
 class Data(TypedDict):
-    aba2sat: JobSummary | None
-    aspforaba: JobSummary | None
+    aba2sat: Union[JobSummary, None]
+    aspforaba: Union[JobSummary, None]
     atom_count: int
     assumption_ratio: float
     max_rules_per_head: int
@@ -26,6 +36,7 @@ class Data(TypedDict):
     loop_percent: float
     solved_correctly: bool
     file: Instance
+    analysis: Union[Analysis, None]
 
 assert os.path.isdir("instances"), "The current directory is missing 'instances', is this a test-run folder?"
 assert os.path.isfile("instances.list"), "The current directory is missing 'instances.list', is this a test-run folder?"
@@ -41,7 +52,10 @@ def convert_to_csv(data: dict[Instance, Data], output_file='output.csv'):
         'aspforaba_mem_requested', 'aspforaba_array_id', 'aspforaba_task_id',
         'aspforaba_status', 'aspforaba_flags', 'aspforaba_state', 'aspforaba_time',
         'atom_count', 'assumption_ratio', 'max_rules_per_head',
-        'max_rule_size', 'loop_percent', 'solved_correctly', 'speedup'
+        'max_rule_size', 'loop_percent', 'solved_correctly', 'speedup', 'analysis_assumptions',
+        'analysis_loops', 'analysis_loops_status', 'analysis_rule_body_average',
+        'analysis_rule_body_maximum', 'analysis_rule_body_minimum', 'analysis_rule_body_stddev',
+        'analysis_rules',
     ]
 
     rows = []
@@ -74,6 +88,14 @@ def convert_to_csv(data: dict[Instance, Data], output_file='output.csv'):
             'loop_percent': details['loop_percent'],
             'solved_correctly': details['solved_correctly'],
             'speedup': details['aspforaba']['time'] / details['aba2sat']['time'],
+            'analysis_assumptions': details['analysis']['assumptions'] if details['analysis'] != None else None,
+            'analysis_loops': details['analysis']['loops'] if details['analysis'] != None else None,
+            'analysis_loops_status': details['analysis']['loops_status'] if details['analysis'] != None else None,
+            'analysis_rule_body_average': details['analysis']['rule_body_average'] if details['analysis'] != None else None,
+            'analysis_rule_body_maximum': details['analysis']['rule_body_maximum'] if details['analysis'] != None else None,
+            'analysis_rule_body_minimum': details['analysis']['rule_body_minimum'] if details['analysis'] != None else None,
+            'analysis_rule_body_stddev': details['analysis']['rule_body_stddev'] if details['analysis'] != None else None,
+            'analysis_rules': details['analysis']['rules'] if details['analysis'] != None else None
         }
         rows.append(row)
 
@@ -95,11 +117,16 @@ def run():
             # Read results and compare them
             aba2sat_result_file = os.path.join("output", f"{file}-aba2sat-result")
             aspforaba_result_file = os.path.join("output", f"{file}-aspforaba-result")
+            analysis_file = os.path.join("output", f"{file}-analysis.json")
             solved_correctly = False
             with open(aba2sat_result_file, 'r') as aba2sat, open(aspforaba_result_file, 'r') as aspforaba:
                 our = aba2sat.read().strip()
                 their = aspforaba.read().strip()
                 solved_correctly = our == their
+            analysis: Union[Analysis, None] = None
+            if os.path.exists(analysis_file):
+                with open(analysis_file, 'r') as f:
+                    analysis = json.load(f)
             (
                 _,
                 atom_count,
@@ -118,14 +145,14 @@ def run():
                 "max_rule_size": int(max_rule_size),
                 "loop_percent": float(loop_percent),
                 "solved_correctly": solved_correctly,
-                "file": file
+                "file": file,
+                "analysis": analysis
             }
             data[file] = info
 
     # Concat the Jobinfo JSON files
     json_files = [file for file in os.listdir(".") if file.startswith('jobinfo-') and file.endswith('.json')]
     assert len(json_files), "No jobinfo files found, is this a test-run folder?"
-    jobs = []
     for file in json_files:
         # Decode file name
         (_, program, batch) = file.rstrip(".json").split("-")

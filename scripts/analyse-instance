@@ -102,7 +102,7 @@ if [ -z "$loops" ]; then
 	loop_status=TIMEOUT
 fi
 
-if [ "$loops" -eq "$MAX_LOOPS" ]; then
+if [ -n "$MAX_LOOPS" ] && [ "$loops" -eq "$MAX_LOOPS" ]; then
 	loop_status=MAX
 fi
 
