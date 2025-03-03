@@ -9,6 +9,8 @@
 # - OFFSET
 # - CONTAINER
 # - OUTPUT_DIR
+# - TIMEOUT_SECS
+# - MAX_LOOPS
 
 NR="$(("${OFFSET:=0}" + "$SLURM_ARRAY_TASK_ID"))"
 
@@ -23,4 +25,4 @@ singularity run \
   --bind "$INSTANCES:/in:ro" \
   --bind "$OUTPUT_DIR:/out" \
   $CONTAINER \
-  analyse-instance --timeout-secs 7200 --max-loops 1000 --file "/in/$basefile" | tee "$OUTPUT_DIR/$basefile-analysis.json"
+  analyse-instance --timeout-secs "$TIMEOUT_SECS" --max-loops "$MAX_LOOPS" --file "/in/$basefile" | tee "$OUTPUT_DIR/$basefile-analysis.json"
