@@ -27,7 +27,7 @@
 //! // The result should be true
 //! assert!(result)
 //! ```
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::literal::RawLiteral;
 
@@ -38,9 +38,9 @@ mod theory;
 mod traverse;
 
 pub use prepared::PreparedAba;
-pub use traverse::{loops_of, Loop, Loops};
+pub use traverse::{Loop, Loops};
 
-pub type Rule = (Num, HashSet<Num>);
+pub type Rule = (Num, BTreeSet<Num>);
 pub type RuleList = Vec<Rule>;
 pub type Num = u32;
 
@@ -57,7 +57,7 @@ impl Aba {
     }
 
     pub fn with_rule<B: IntoIterator<Item = Num>>(mut self, head: Num, body: B) -> Self {
-        let mut body_trans = HashSet::new();
+        let mut body_trans = BTreeSet::new();
         body.into_iter().for_each(|elem| {
             body_trans.insert(elem);
         });

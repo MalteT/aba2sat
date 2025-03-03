@@ -16,7 +16,7 @@ use aba2sat::{
         },
         Num,
     },
-    Error,
+    Error, STOP_LOOP_COUNTING,
 };
 use aba2sat::{parser, Result};
 use args::ARGS;
@@ -29,7 +29,11 @@ trait IccmaFormattable {
 }
 
 fn __main() -> Result {
+    // Init logger
     pretty_env_logger::init();
+    // Register SIGUSR1 handler
+    signal_hook::flag::register(signal_hook::consts::SIGUSR1, STOP_LOOP_COUNTING.clone())?;
+
     let args = match &*ARGS {
         Some(args) => args,
         None => {

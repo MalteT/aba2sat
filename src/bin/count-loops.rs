@@ -1,4 +1,7 @@
-use aba2sat::{aba::Aba, parser};
+use aba2sat::{
+    aba::{Aba, Loops},
+    parser, STOP_LOOP_COUNTING,
+};
 use std::path::PathBuf;
 
 use clap::{command, Parser};
@@ -35,12 +38,14 @@ pub enum Error {
 }
 
 fn count_loops(aba: &Aba, max_loops: Option<usize>) -> usize {
-    aba2sat::aba::loops_of(aba)
-        .take(max_loops.unwrap_or(usize::MAX))
-        .count()
+    Loops::of(aba, max_loops).count()
 }
 
 fn __main() -> Result<(), Error> {
+    // Init logger
+    pretty_env_logger::init();
+    // Register SIGUSR1 handler
+    signal_hook::flag::register(signal_hook::consts::SIGUSR1, STOP_LOOP_COUNTING.clone())?;
     let args = Args::parse();
     let content = std::fs::read_to_string(args.file).map_err(Error::OpeningAbaFile)?;
     let aba = parser::aba_file(&content)?;

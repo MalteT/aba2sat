@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 use crate::{
-    aba::{traverse::loops_of, Num},
+    aba::Num,
     clauses::Clause,
     literal::{
         lits::{CandidateRuleBodyActive, LoopHelper},
@@ -9,11 +9,11 @@ use crate::{
     },
 };
 
-use super::{theory::theory_helper, Aba, Context};
+use super::{theory::theory_helper, traverse::Loops, Aba, Context};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Loop {
-    heads: HashSet<Num>,
+    heads: BTreeSet<Num>,
     support: Vec<usize>,
 }
 
@@ -182,12 +182,7 @@ fn calculate_loops_and_their_support(
     aba: &Aba,
     max_loops: Option<usize>,
 ) -> impl Iterator<Item = Loop> + '_ {
-    let max_loops = max_loops.unwrap_or(usize::MAX);
-    loops_of(aba).enumerate().map_while(move |(idx, l)| {
-        if idx >= max_loops {
-            eprintln!("Too many loops! {max_loops}");
-            return None;
-        }
+    Loops::of(aba, max_loops).map(move |l| {
         // Relevant rules are those that contain only elements from outside the loop
         // All other rules cannot influence the value of the loop
         let support = aba
@@ -198,10 +193,10 @@ fn calculate_loops_and_their_support(
             .filter(|(_rule_id, (_head, body))| body.is_disjoint(&l.heads))
             .map(|(rule_id, _)| rule_id)
             .collect();
-        Some(Loop {
+        Loop {
             heads: l.heads,
             support,
-        })
+        }
     })
 }
 

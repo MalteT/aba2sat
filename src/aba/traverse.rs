@@ -1,136 +1,181 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+use bit_set::BitSet;
+
+use crate::STOP_LOOP_COUNTING;
 
 use super::{Aba, Num, RuleList};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
-struct RuleIdx(usize);
-
-impl RuleIdx {
-    fn advance(&mut self) {
-        self.0 += 1;
-    }
+pub struct Loops {
+    rem_loops: Option<usize>,
+    sccs: Vec<Graph>,
+    rem: Vec<BitSet<usize>>,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
-struct UniverseIdx(usize);
-
-#[derive(Debug)]
-pub struct Loops<'a> {
-    aba: &'a Aba,
-    /// Strongly Connected Components
-    /// These are the indizes of the SCCs as used in tarjans algorithm
-    /// such that the index of a rule in aba.rules can be used here
-    /// to get the component of the rule's head
-    sccs: Vec<usize>,
-    rule_indices: Vec<RuleIdx>,
-    found: Vec<Loop>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Loop {
-    pub heads: HashSet<Num>,
-}
-
-pub fn loops_of(aba: &Aba) -> Loops<'_> {
-    let sccs = compute_scc_indizes(&aba.rules);
-    Loops {
-        aba,
-        sccs,
-        rule_indices: vec![RuleIdx(0)],
-        found: vec![],
-    }
-}
-
-impl<'a> Iterator for Loops<'a> {
-    type Item = Loop;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            // Ensure that the rule_indices list is not empty, if it is, we're done
-            if self.rule_indices.is_empty() {
-                break None;
-            }
-            // Safe! We've exited already, if rule_indices is empty
-            let rule_idx = self.rule_indices.last().unwrap();
-            // Ensure that the rule_idx is valid, if it is not, backtrack
-            if rule_idx.0 >= self.aba.rules.len() {
-                // We're at the end of our rule list, backtrack
-                self.rule_indices.pop();
-                match self.rule_indices.last_mut() {
-                    Some(idx) => {
-                        idx.advance();
-                        continue;
-                    }
-                    None => {
-                        // We popped the last rule, iterator ends here
-                        break None;
-                    }
-                }
-            }
-            // Ensure that the rule_idx does not point to a rule that has been applied already
-            if self.rule_indices[0..self.rule_indices.len() - 1].contains(rule_idx) {
-                // The rule was applied before
-                self.rule_indices.last_mut().unwrap().advance();
-                continue;
-            }
-            // Ensure causality
-            if self.rule_indices.len() >= 2 {
-                // There was a rule before this one, ensure that the causality works
-                // i.e. the next rule should contain the head of the last rule
-                let last_rule_idx = self.rule_indices[self.rule_indices.len() - 2];
-                let (last_rule_head, _) = self.aba.rules[last_rule_idx.0];
-                if !self.aba.rules[rule_idx.0].1.contains(&last_rule_head) {
-                    self.rule_indices.last_mut().unwrap().advance();
-                    continue;
-                }
-                // If this rule's head's SCC differs from the SCC of the previous rule's head
-                // we can simply skip the current rule as there would be no coming back after
-                // leaving this SCC
-                if self.sccs[last_rule_idx.0] != self.sccs[rule_idx.0] {
-                    self.rule_indices.last_mut().unwrap().advance();
-                    continue;
-                }
-            } else {
-                // Check that we're not just having a body full of assumptions
-                let (_, body) = &self.aba.rules[rule_idx.0];
-                let assumptions = self.aba.assumptions().collect::<HashSet<_>>();
-                if !body.iter().any(|element| !assumptions.contains(element)) {
-                    self.rule_indices.last_mut().unwrap().advance();
-                    continue;
-                }
-            }
-            // Still rules to try
-            let (head, _) = &self.aba.rules[rule_idx.0];
-            // Check whether the head of the current rule is part of the body
-            // of the first rule in our branch, if so, the entire branch is a loop
-            if self.aba.rules[self.rule_indices[0].0].1.contains(head) {
-                // The rule head is already active, loop found!
-                let heads = self
-                    .rule_indices
-                    .iter()
-                    .map(|RuleIdx(idx)| self.aba.rules[*idx].0)
-                    .collect::<HashSet<_>>();
-                // Advance the rule index for the next call
-                // Safe! No adjustment to the rule_indices since the last check at the start of the loop
-                self.rule_indices.last_mut().unwrap().advance();
-                let new_loop = Loop {
-                    heads: heads.clone(),
-                };
-                if !self.found.contains(&new_loop) {
-                    self.found.push(new_loop.clone());
-                    break Some(new_loop);
-                } else {
-                    continue;
-                }
-            }
-            // The rule could be applied and does not cause a conflict
-            // Go one level deeper
-            self.rule_indices.push(RuleIdx(0));
+impl Loops {
+    pub fn of(aba: &'_ Aba, max_loops: Option<usize>) -> Self {
+        // Set the global stopper to false;
+        STOP_LOOP_COUNTING.store(false, std::sync::atomic::Ordering::Relaxed);
+        Self {
+            rem_loops: max_loops,
+            sccs: Graph::compute_sccs(aba).collect(),
+            rem: vec![],
         }
     }
 }
 
-fn compute_scc_indizes(rules: &RuleList) -> Vec<usize> {
+/// A single loop within our [`Aba`]
+///
+/// Represented as a set of rule heads.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Loop {
+    pub heads: BTreeSet<Num>,
+}
+
+/// Graph representation of our [`Aba`]
+///
+/// This is guaranteed to be a single strongly-connected component
+/// with at least two nodes and thus at least two edges.
+struct Graph {
+    /// The edges of our graph
+    ///
+    /// An edge (s, t) exists if there is a rule t <- B with s in B.
+    next: BTreeMap<Num, BTreeSet<Num>>,
+}
+impl Graph {
+    fn compute_sccs(aba: &Aba) -> impl Iterator<Item = Self> + '_ {
+        compute_sccs(&aba.rules)
+            .into_iter()
+            .filter(|scc| scc.len() >= 2)
+            .map(|scc| {
+                aba.rules
+                    .iter()
+                    .flat_map(|(head, body)| body.iter().map(|body_element| (*body_element, *head)))
+                    .filter(|(from, to)| scc.contains(from) && scc.contains(to))
+                    .fold(
+                        BTreeMap::<Num, BTreeSet<Num>>::new(),
+                        |mut next, (from, to)| {
+                            next.entry(from).or_default().insert(to);
+                            next
+                        },
+                    )
+            })
+            .map(|next| Graph { next })
+    }
+
+    fn compute_loops(&self, max_loops: Option<usize>) -> Vec<BitSet<usize>> {
+        let max_loops = max_loops.unwrap_or(usize::MAX);
+        #[derive(Debug)]
+        struct Frame {
+            node: Num,
+            open: BTreeSet<Num>,
+        }
+        let mut stack: Vec<Frame> = vec![{
+            let node = self.random_node();
+            Frame {
+                open: self.next.get(&node).unwrap().clone(),
+                node,
+            }
+        }];
+        let mut loops: Vec<BitSet<usize>> = vec![];
+        // Begin!
+        loop {
+            if stack.is_empty()
+                || loops.len() >= max_loops
+                || STOP_LOOP_COUNTING.load(std::sync::atomic::Ordering::Relaxed)
+            {
+                log::info!("Aborting loop counting due to received signal");
+                break;
+            }
+            // Push to the stack!
+            {
+                // Get the last frame, this is safe, we've just checked for non-emptiness
+                let last_frame = stack.last().unwrap();
+                let next = last_frame.open.iter().next().cloned();
+                match next {
+                    Some(next) => {
+                        // remove next from the set of open edges
+                        let last = stack.len() - 1;
+                        stack[last].open.remove(&next);
+                        // push new frame
+                        stack.push(Frame {
+                            open: self.next.get(&next).cloned().unwrap_or_default(),
+                            node: next,
+                        });
+                    }
+                    None => {
+                        // There are no next nodes to try, pop that frame and start over
+                        stack.pop();
+                        continue;
+                    }
+                }
+            }
+            // At this point the stack cannot be empty
+            let frame = stack.last().unwrap();
+            // Check whether this is a loop
+            let other_index = stack[0..stack.len() - 1]
+                .iter()
+                .enumerate()
+                .find(|(_, f)| f.node == frame.node);
+            match other_index {
+                Some((idx, _)) => {
+                    // We have found a loop!
+                    let new_loop = stack[idx + 1..].iter().map(|f| f.node as usize).collect();
+                    if !loops.iter().any(|l| *l == new_loop) {
+                        // It's a novel loop!
+                        loops.push(new_loop);
+                    }
+                    // drop the current frame
+                    stack.pop();
+                }
+                None => {
+                    // Not a loop yet
+                    // TODO: continue
+                }
+            }
+        }
+        log::info!("Found {} small loops", loops.len());
+        // calculate joined loops
+        let mut left_idx = 0;
+        // the left index will walk once through all loops, including new ones
+        'outer: while left_idx < loops.len() && loops.len() < max_loops {
+            // the right index will walk through the entire list for every left index
+            for right_idx in 0..loops.len() {
+                if left_idx == right_idx {
+                    continue;
+                }
+                let left = &loops[left_idx];
+                let right = &loops[right_idx];
+                // left \cap right
+                let mut new = left.clone();
+                new.intersect_with(right);
+                // check that left and right really intersect AND the intersection differs from both sets
+                if !new.is_empty() && new != *right && new != *left {
+                    // make new the union of left and right
+                    new.union_with(left);
+                    new.union_with(right);
+                    if !loops.iter().any(|l| new == *l) {
+                        loops.push(new)
+                    }
+                    if loops.len() >= max_loops {
+                        break 'outer;
+                    }
+                }
+            }
+            left_idx += 1;
+        }
+        log::info!("Found {} total loops", loops.len());
+        loops
+    }
+
+    /// A random node from this graph
+    fn random_node(&self) -> Num {
+        // Safe, the graph is guaranteed to not be empty!
+        *self.next.keys().next().unwrap()
+    }
+}
+
+fn compute_sccs(rules: &RuleList) -> Vec<BTreeSet<Num>> {
     // We're only interested in atoms that can be reached via a rule.
     // Since every head may have multiple rules, we join their bodies here.
     // Instead of using the direction `body` -> `head` as our `edge`, we
@@ -143,6 +188,7 @@ fn compute_scc_indizes(rules: &RuleList) -> Vec<usize> {
             map
         },
     );
+    let mut sccs = vec![];
     // current tarjan index
     let mut index = 0;
     // The stack (our SCC in the making)
@@ -158,6 +204,7 @@ fn compute_scc_indizes(rules: &RuleList) -> Vec<usize> {
     let mut info: BTreeMap<Num, Info> = BTreeMap::new();
     // Tarjans strongconnect function
     fn strong_connect(
+        sccs: &mut Vec<BTreeSet<Num>>,
         succ: &BTreeMap<Num, HashSet<Num>>,
         info: &mut BTreeMap<Num, Info>,
         stack: &mut Vec<Num>,
@@ -189,7 +236,7 @@ fn compute_scc_indizes(rules: &RuleList) -> Vec<usize> {
             match info.get(successor) {
                 // Not yet visited
                 None => {
-                    strong_connect(succ, info, stack, index, *successor);
+                    strong_connect(sccs, succ, info, stack, index, *successor);
                     let successor_lowlink = info.get(successor).unwrap().lowlink;
                     let node_info = info.get_mut(&node).unwrap();
                     node_info.lowlink = node_info.lowlink.min(successor_lowlink);
@@ -205,33 +252,55 @@ fn compute_scc_indizes(rules: &RuleList) -> Vec<usize> {
             }
         }
         let node_info = info.get(&node).unwrap();
-        let node_info_lowlink = node_info.lowlink;
         // This is the root node of the SCC
         if node_info.lowlink == node_info.index {
-            // we don't need to create the SCC, we're only interested in the final index values
+            // create a new SCC from the stack
+            let mut scc = BTreeSet::new();
             loop {
                 // Remove the SCC from the stack
                 let popped = stack.pop().unwrap();
+                scc.insert(popped);
                 let popped_info = info.get_mut(&popped).unwrap();
                 popped_info.on_stack = false;
-                popped_info.lowlink = node_info_lowlink;
                 if popped == node {
                     break;
                 }
             }
+            sccs.push(scc)
         }
     }
     // iterate over all elements and their successors
     for node in succ.keys() {
         if !info.contains_key(node) {
-            strong_connect(&succ, &mut info, &mut stack, &mut index, *node)
+            strong_connect(&mut sccs, &succ, &mut info, &mut stack, &mut index, *node)
         }
     }
-    // map our findings to the rules
-    rules
-        .iter()
-        .map(|(head, _)| info.get(head).unwrap().lowlink)
-        .collect()
+    // Return the strongly connected components
+    sccs
+}
+
+impl Iterator for Loops {
+    type Item = Loop;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rem_loops == Some(0) {
+            return None;
+        }
+        match self.rem.pop() {
+            Some(heads) => {
+                self.rem_loops = self.rem_loops.map(|rem| rem - 1);
+                Some(Loop {
+                    heads: heads.into_iter().map(|raw| raw as Num).collect(),
+                })
+            }
+            None if self.sccs.is_empty() => None,
+            None => {
+                let next = self.sccs.pop().unwrap();
+                self.rem = next.compute_loops(self.rem_loops);
+                self.next()
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -243,10 +312,10 @@ mod tests {
     #[test]
     fn no_loops() {
         let aba = Aba::default();
-        let loops = loops_of(&aba).count();
+        let loops = Loops::of(&aba, None).count();
         assert_eq!(loops, 0);
 
-        let mut loops = loops_of(&aba);
+        let mut loops = Loops::of(&aba, None);
         assert!(matches!(loops.next(), None));
         assert!(matches!(loops.next(), None));
         assert!(matches!(loops.next(), None));
@@ -260,11 +329,15 @@ mod tests {
             .with_rule('p', ['q'])
             .with_rule('q', ['p'])
             .with_rule('p', ['a']);
-        let the_loop = aba.forward_set(['p', 'q'].into_iter().collect()).unwrap();
-        let loops = loops_of(aba.aba()).count();
+        let the_loop = aba
+            .forward_set(['p', 'q'].into_iter().collect())
+            .unwrap()
+            .into_iter()
+            .collect();
+        let loops = Loops::of(aba.aba(), None).count();
         assert_eq!(loops, 1);
 
-        let mut loops = loops_of(&aba.aba());
+        let mut loops = Loops::of(&aba.aba(), None);
         let first = loops.next().unwrap();
         assert_eq!(first.heads, the_loop);
         assert!(matches!(loops.next(), None));
@@ -280,14 +353,20 @@ mod tests {
             .with_rule('p', ['q'])
             .with_rule('r', ['q'])
             .with_rule('p', ['r']);
-        let first_loop = aba.forward_set(['p', 'q'].into_iter().collect()).unwrap();
+        let first_loop = aba
+            .forward_set(['p', 'q'].into_iter().collect())
+            .unwrap()
+            .into_iter()
+            .collect();
         let second_loop = aba
             .forward_set(['p', 'q', 'r'].into_iter().collect())
-            .unwrap();
-        let loops = loops_of(aba.aba()).count();
+            .unwrap()
+            .into_iter()
+            .collect();
+        let loops = Loops::of(aba.aba(), None).count();
         assert_eq!(loops, 2);
 
-        let mut loops = loops_of(&aba.aba());
+        let mut loops = Loops::of(&aba.aba(), None);
         let next = loops.next().unwrap();
         assert!(next.heads == first_loop || next.heads == second_loop);
         let next = loops.next().unwrap();
@@ -307,12 +386,20 @@ mod tests {
             .with_rule('p', ['r'])
             .with_rule('r', ['p']);
         let expected = [
-            aba.forward_set(['p', 'q'].into_iter().collect()).unwrap(),
+            aba.forward_set(['p', 'q'].into_iter().collect())
+                .unwrap()
+                .into_iter()
+                .collect(),
             aba.forward_set(['p', 'q', 'r'].into_iter().collect())
-                .unwrap(),
-            aba.forward_set(['p', 'r'].into_iter().collect()).unwrap(),
+                .unwrap()
+                .into_iter()
+                .collect(),
+            aba.forward_set(['p', 'r'].into_iter().collect())
+                .unwrap()
+                .into_iter()
+                .collect(),
         ];
-        let mut loops = loops_of(&aba.aba());
+        let mut loops = Loops::of(&aba.aba(), None);
         for _number in 0..expected.len() {
             let next = loops.next().unwrap();
             assert!(
@@ -335,7 +422,11 @@ mod tests {
             .with_rule('v', ['w'])
             .with_rule('w', ['u']);
         let rules = &aba.aba().rules;
-        let scc_indizes = compute_scc_indizes(rules);
-        assert_eq!(vec![0, 0, 2, 2, 2], scc_indizes);
+        let scc_indizes = compute_sccs(rules);
+        let expected: Vec<BTreeSet<Num>> = vec![
+            vec![1, 2].into_iter().collect(),
+            vec![3, 4, 5].into_iter().collect(),
+        ];
+        assert_eq!(expected, scc_indizes);
     }
 }
