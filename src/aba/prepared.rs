@@ -1,13 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 
-use crate::{
-    aba::Num,
-    clauses::Clause,
-    literal::{
-        lits::{CandidateRuleBodyActive, LoopHelper},
-        IntoLiteral,
-    },
-};
+use crate::{aba::Num, clauses::Clause, literal::IntoLiteral};
 
 use super::{theory::theory_helper, traverse::Loops, Aba, Context};
 
@@ -78,21 +71,21 @@ impl PreparedAba {
             let last_clause = r#loop
                 .support
                 .iter()
-                .map(|el| CandidateRuleBodyActive::from(*el).pos())
-                .chain(std::iter::once(LoopHelper::from(loop_id).neg()))
+                .map(|el| Ctx::Rule::from(*el).pos())
+                .chain(std::iter::once(Ctx::Loop::from(loop_id).neg()))
                 .collect();
             // -l or LH_i
             let head_clauses = r#loop.heads.iter().map(move |head| {
                 Clause::from(vec![
-                    LoopHelper::from(loop_id).pos(),
+                    Ctx::Loop::from(loop_id).pos(),
                     Ctx::Base::from(*head).neg(),
                 ])
             });
             // LH_i or -RBA_x
             let tuple_clauses = r#loop.support.iter().map(move |rule_id| {
                 Clause::from(vec![
-                    CandidateRuleBodyActive::from(*rule_id).neg(),
-                    LoopHelper::from(loop_id).pos(),
+                    Ctx::Rule::from(*rule_id).neg(),
+                    Ctx::Loop::from(loop_id).pos(),
                 ])
             });
             tuple_clauses.chain([last_clause]).chain(head_clauses)

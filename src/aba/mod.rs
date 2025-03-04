@@ -120,14 +120,17 @@ impl Aba {
 pub trait Context {
     type Base: From<Num> + Into<RawLiteral> + 'static;
     type Rule: From<usize> + Into<RawLiteral> + 'static;
+    type Loop: From<usize> + Into<RawLiteral> + 'static;
 }
 
 impl Context for crate::literal::lits::Candidate {
     type Base = Self;
     type Rule = crate::literal::lits::CandidateRuleBodyActive;
+    type Loop = crate::literal::lits::CandidateLoopHelper;
 }
 
 impl Context for crate::literal::lits::Attacker {
     type Base = Self;
     type Rule = crate::literal::lits::AttackerRuleBodyActive;
+    type Loop = crate::literal::lits::AttackerLoopHelper;
 }

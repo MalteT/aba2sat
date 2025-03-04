@@ -32,10 +32,10 @@ fn initial_complete_clauses(aba: &PreparedAba) -> ClauseList {
     // Additional complete logic
     for (assumption, inverse) in &aba.inverses {
         // For any assumption `a` and it's inverse `b`:
-        //   b not in th(A) => a in th(S)
+        //   b not in th(Attacker) => a in th(Candidate)
         clauses.push(Clause::from(vec![
-            Candidate::from(*inverse).pos(),
-            Attacker::from(*assumption).pos(),
+            Attacker::from(*inverse).pos(),
+            Candidate::from(*assumption).pos(),
         ]));
     }
     clauses
@@ -56,9 +56,9 @@ impl MultishotProblem for EnumerateCompleteExtensions {
                     .assumptions()
                     .map(|assumption| {
                         if just_found.contains(assumption) {
-                            Attacker::from(*assumption).neg()
+                            Candidate::from(*assumption).neg()
                         } else {
-                            Attacker::from(*assumption).pos()
+                            Candidate::from(*assumption).pos()
                         }
                     })
                     .collect();
@@ -77,7 +77,7 @@ impl MultishotProblem for EnumerateCompleteExtensions {
             .inverses
             .keys()
             .filter_map(|assumption| {
-                let literal = Attacker::from(*assumption).pos();
+                let literal = Candidate::from(*assumption).pos();
                 let raw = state.map.get_raw(&literal)?;
                 match state.solver.value(raw) {
                     Some(true) => Some(*assumption),
@@ -99,7 +99,7 @@ impl Problem for DecideCredulousComplete {
 
     fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
         let mut clauses = initial_complete_clauses(aba);
-        clauses.push(Clause::from(vec![Attacker::from(self.element).pos()]));
+        clauses.push(Clause::from(vec![Candidate::from(self.element).pos()]));
         clauses
     }
 

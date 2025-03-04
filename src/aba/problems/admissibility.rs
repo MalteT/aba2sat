@@ -43,28 +43,28 @@ pub fn initial_admissibility_clauses(aba: &PreparedAba) -> ClauseList {
     for (assumption, inverse) in &aba.inverses {
         [
             // For any assumption `a` and it's inverse `b`:
-            //   a in th(A) <=> b not in th(S)
+            //   b not in th(Candidate) <=> a in th(Attacker)
             Clause::from(vec![
-                Candidate::from(*assumption).pos(),
-                Attacker::from(*inverse).pos(),
+                Candidate::from(*inverse).pos(),
+                Attacker::from(*assumption).pos(),
             ]),
-            Clause::from(vec![
-                Candidate::from(*assumption).neg(),
-                Attacker::from(*inverse).neg(),
-            ]),
-            // Prevent attacks from the opponent to the selected set
-            // For any assumption `a` and it's inverse `b`:
-            //   b in th(A) and a in th(S) => bottom
             Clause::from(vec![
                 Candidate::from(*inverse).neg(),
                 Attacker::from(*assumption).neg(),
             ]),
-            // Prevent self-attacks
+            // Prevent attacks from the opponent to the selected set
             // For any assumption `a` and it's inverse `b`:
-            //   a in th(S) and b in th(S) => bottom
+            //   b in th(Attacker) and a in th(Candidate) => bottom
             Clause::from(vec![
-                Attacker::from(*assumption).neg(),
                 Attacker::from(*inverse).neg(),
+                Candidate::from(*assumption).neg(),
+            ]),
+            // Ensure conflict-freeness
+            // For any assumption `a` and it's inverse `b`:
+            //   a in th(Candidate) and b in th(Candidate) => bottom
+            Clause::from(vec![
+                Candidate::from(*assumption).neg(),
+                Candidate::from(*inverse).neg(),
             ]),
         ]
         .into_iter()
@@ -78,7 +78,7 @@ fn construct_found_set(state: SolverState<'_>) -> HashSet<Num> {
         .aba
         .assumptions()
         .filter_map(|assumption| {
-            let literal = Attacker::from(*assumption).pos();
+            let literal = Candidate::from(*assumption).pos();
             let raw = state.map.get_raw(&literal)?;
             match state.solver.value(raw) {
                 Some(true) => Some(*assumption),
@@ -97,7 +97,7 @@ impl Problem for SampleAdmissibleExtension {
         let no_empty_set: Clause = aba
             .inverses
             .keys()
-            .map(|assumption| Attacker::from(*assumption).pos())
+            .map(|assumption| Candidate::from(*assumption).pos())
             .collect();
         clauses.push(no_empty_set);
         clauses
@@ -123,7 +123,7 @@ impl MultishotProblem for EnumerateAdmissibleExtensions {
                 let no_empty_set: Clause = aba
                     .inverses
                     .keys()
-                    .map(|assumption| Attacker::from(*assumption).pos())
+                    .map(|assumption| Candidate::from(*assumption).pos())
                     .collect();
                 clauses.push(no_empty_set);
                 clauses
@@ -137,9 +137,9 @@ impl MultishotProblem for EnumerateAdmissibleExtensions {
                     .assumptions()
                     .map(|assumption| {
                         if just_found.contains(assumption) {
-                            Attacker::from(*assumption).neg()
+                            Candidate::from(*assumption).neg()
                         } else {
-                            Attacker::from(*assumption).pos()
+                            Candidate::from(*assumption).pos()
                         }
                     })
                     .collect();
@@ -158,7 +158,7 @@ impl MultishotProblem for EnumerateAdmissibleExtensions {
             .inverses
             .keys()
             .filter_map(|assumption| {
-                let literal = Attacker::from(*assumption).pos();
+                let literal = Candidate::from(*assumption).pos();
                 let raw = state.map.get_raw(&literal)?;
                 match state.solver.value(raw) {
                     Some(true) => Some(*assumption),
@@ -191,7 +191,7 @@ impl Problem for VerifyAdmissibleExtension {
         let mut clauses = initial_admissibility_clauses(aba);
         // Force inference on all members of the set
         for assumption in aba.assumptions() {
-            let inf = Attacker::from(*assumption);
+            let inf = Candidate::from(*assumption);
             if self.assumptions.contains(assumption) {
                 clauses.push(Clause::from(vec![inf.pos()]))
             } else {
@@ -225,7 +225,7 @@ impl Problem for DecideCredulousAdmissibility {
 
     fn additional_clauses(&self, aba: &PreparedAba) -> ClauseList {
         let mut clauses = initial_admissibility_clauses(aba);
-        clauses.push(Clause::from(vec![Attacker::from(self.element).pos()]));
+        clauses.push(Clause::from(vec![Candidate::from(self.element).pos()]));
         clauses
     }
 

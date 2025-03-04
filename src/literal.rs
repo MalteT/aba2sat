@@ -57,8 +57,12 @@ pub mod lits {
     into_raw!(AttackerRuleBodyActive from usize);
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct LoopHelper(usize);
-    into_raw!(LoopHelper from usize);
+    pub struct CandidateLoopHelper(usize);
+    into_raw!(CandidateLoopHelper from usize);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct AttackerLoopHelper(usize);
+    into_raw!(AttackerLoopHelper from usize);
 }
 
 /// A Literal can be used in SAT [`Clause`](crate::clauses::Clause)s
@@ -76,9 +80,10 @@ pub enum Literal {
 pub enum RawLiteral {
     Candidate(lits::Candidate),
     CandidateRuleBodyActive(lits::CandidateRuleBodyActive),
+    CandidateLoopHelper(lits::CandidateLoopHelper),
     Attacker(lits::Attacker),
     AttackerRuleBodyActive(lits::AttackerRuleBodyActive),
-    LoopHelper(lits::LoopHelper),
+    AttackerLoopHelper(lits::AttackerLoopHelper),
 }
 
 /// Convert the type into it's literal

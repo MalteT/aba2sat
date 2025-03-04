@@ -84,7 +84,6 @@ impl Graph {
                 || loops.len() >= max_loops
                 || STOP_LOOP_COUNTING.load(std::sync::atomic::Ordering::Relaxed)
             {
-                log::info!("Aborting loop counting due to received signal");
                 break;
             }
             // Push to the stack!
@@ -134,7 +133,6 @@ impl Graph {
                 }
             }
         }
-        log::info!("Found {} small loops", loops.len());
         // calculate joined loops
         let mut left_idx = 0;
         // the left index will walk once through all loops, including new ones
@@ -164,7 +162,6 @@ impl Graph {
             }
             left_idx += 1;
         }
-        log::info!("Found {} total loops", loops.len());
         loops
     }
 

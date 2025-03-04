@@ -240,7 +240,7 @@ fn rules_with_trivial_cycles() {
 }
 
 #[test]
-fn mystery() {
+fn infamous_eight() {
     let aba = DebugAba::default()
         .with_assumption('a', 'b')
         .with_assumption('b', 'c')
@@ -250,6 +250,22 @@ fn mystery() {
         .with_rule('d', ['f'])
         .with_rule('f', ['c'])
         .with_rule('f', ['e']);
+    let element = aba.forward_atom('a').unwrap();
+    let result =
+        crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone(), None)
+            .unwrap();
+    assert!(!result, "a is not credulous complete");
+}
+
+#[test]
+fn mystery() {
+    let aba = DebugAba::default()
+        .with_assumption('a', 'b')
+        .with_assumption('b', 'd')
+        .with_assumption('c', 'c')
+        .with_rule('d', ['e'])
+        .with_rule('e', ['d'])
+        .with_rule('d', ['c']);
     let element = aba.forward_atom('a').unwrap();
     let result =
         crate::aba::problems::solve(DecideCredulousComplete { element }, aba.aba().clone(), None)
